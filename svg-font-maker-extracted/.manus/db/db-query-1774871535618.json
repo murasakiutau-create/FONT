@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, unicode, `char`, width, LEFT(pathData, 300) as pd FROM glyphs WHERE projectId = 2 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3fbbMW4piKqGCVB.b48be9658793 --database Cwdp24ARGfiSddacai8GsZ --execute SELECT id, unicode, `char`, width, LEFT(pathData, 300) as pd FROM glyphs WHERE projectId = 2 LIMIT 5;",
+  "rows": [
+    {
+      "id": "60001",
+      "unicode": "97",
+      "char": "a",
+      "width": "600",
+      "pd": "M 423.7495064875563 380.1733268035688 C 404.75513934008455 380.21083726997625 394.7465159987929 373.4508562297598 391.5470668375257 358.428270136299 L 388.92720257767814 346.13201588186695 L 375.56292316259714 357.0795101760813 C 339.044753831165 386.98978696501587 294.95470117789046 380.45584528883"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tunicode\tchar\twidth\tpd\n60001\t97\ta\t600\tM 423.7495064875563 380.1733268035688 C 404.75513934008455 380.21083726997625 394.7465159987929 373.4508562297598 391.5470668375257 358.428270136299 L 388.92720257767814 346.13201588186695 L 375.56292316259714 357.0795101760813 C 339.044753831165 386.98978696501587 294.95470117789046 380.45584528883\n",
+  "stderr": "",
+  "execution_time_ms": 1526
+}

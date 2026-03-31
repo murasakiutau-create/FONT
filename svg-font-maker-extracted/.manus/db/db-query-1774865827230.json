@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, unicode, `char`, pathData, width FROM glyphs WHERE projectId=2 LIMIT 3",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3fbbMW4piKqGCVB.b48be9658793 --database Cwdp24ARGfiSddacai8GsZ --execute SELECT id, unicode, `char`, pathData, width FROM glyphs WHERE projectId=2 LIMIT 3",
+  "rows": [
+    {
+      "id": "30001",
+      "unicode": "97",
+      "char": "a",
+      "pathData": "NULL",
+      "width": "600"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tunicode\tchar\tpathData\twidth\n30001\t97\ta\tNULL\t600\n",
+  "stderr": "",
+  "execution_time_ms": 1565
+}
