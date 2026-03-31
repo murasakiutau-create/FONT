@@ -1307,7 +1307,6 @@ const App = {
     reader.onload = e => {
       try {
         const svgText = e.target.result;
-        // Parse template metadata
         const metaMatch = svgText.match(/FONT_TEMPLATE\s+cols="(\d+)"\s+cellSize="(\d+)"\s+upm="(\d+)"\s+ascender="(-?\d+)"\s+descender="(-?\d+)"\s+capHeight="(\d+)"\s+xHeight="(\d+)"/);
         if (!metaMatch) {
           this._notify('テンプレートのメタデータが見つかりません。テンプレートボタンでダウンロードしたSVGを使ってください。', 'error');
@@ -1331,89 +1330,114 @@ const App = {
           }
         }
 
+        // Step 1: Collect ALL user-drawn paths with their absolute coordinates
+        const allUserPaths = [];
+        const shapeTypes = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline'];
+
+        const collectPaths = (el, parentMatrix) => {
+          const localMatrix = getElementMatrix(el);
+          const combined = multiplyMatrix(parentMatrix, localMatrix);
+
+          if (shapeTypes.includes(el.tagName)) {
+            // Skip template elements: those with class, or inside <style>/<defs>
+            if (el.getAttribute('class')) return;
+            if (el.closest('style') || el.closest('defs')) return;
+            // Skip template ref-char text (these are <text>, not shapes, so already excluded)
+
+            let cmds = [];
+            if (el.tagName === 'path') {
+              const d = el.getAttribute('d');
+              if (d) cmds = parseSVGPath(d);
+            } else if (el.tagName === 'rect') {
+              // Skip template cell borders (stroke only, no fill or fill=none)
+              const fill = el.getAttribute('fill');
+              const stroke = el.getAttribute('stroke');
+              if ((!fill || fill === 'none') && stroke) return;
+              const rx = parseFloat(el.getAttribute('x') || 0), ry = parseFloat(el.getAttribute('y') || 0);
+              const rw = parseFloat(el.getAttribute('width') || 0), rh = parseFloat(el.getAttribute('height') || 0);
+              if (rw === 0 || rh === 0) return;
+              cmds = [{ type: 'M', x: rx, y: ry }, { type: 'L', x: rx + rw, y: ry }, { type: 'L', x: rx + rw, y: ry + rh }, { type: 'L', x: rx, y: ry + rh }, { type: 'Z' }];
+            } else if (el.tagName === 'circle') {
+              const cx = parseFloat(el.getAttribute('cx') || 0), cy = parseFloat(el.getAttribute('cy') || 0), r = parseFloat(el.getAttribute('r') || 0);
+              if (r === 0) return;
+              cmds = parseSVGPath(`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy} A ${r} ${r} 0 0 1 ${cx - r} ${cy} Z`);
+            } else if (el.tagName === 'ellipse') {
+              const cx = parseFloat(el.getAttribute('cx') || 0), cy = parseFloat(el.getAttribute('cy') || 0);
+              const erx = parseFloat(el.getAttribute('rx') || 0), ery = parseFloat(el.getAttribute('ry') || 0);
+              if (erx === 0 || ery === 0) return;
+              cmds = parseSVGPath(`M ${cx - erx} ${cy} A ${erx} ${ery} 0 0 1 ${cx + erx} ${cy} A ${erx} ${ery} 0 0 1 ${cx - erx} ${cy} Z`);
+            } else if (el.tagName === 'polygon' || el.tagName === 'polyline') {
+              const pts = (el.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number);
+              if (pts.length >= 4) {
+                cmds = [{ type: 'M', x: pts[0], y: pts[1] }];
+                for (let i = 2; i < pts.length; i += 2) cmds.push({ type: 'L', x: pts[i], y: pts[i + 1] });
+                if (el.tagName === 'polygon') cmds.push({ type: 'Z' });
+              }
+            }
+
+            if (combined) cmds = applyMatrix(cmds, combined);
+            if (cmds.length > 0) {
+              allUserPaths.push(cmds);
+            }
+            return;
+          }
+
+          // Recurse into children
+          for (const child of el.children) {
+            collectPaths(child, combined);
+          }
+        };
+
+        const root = doc.documentElement;
+        const identity = [1, 0, 0, 1, 0, 0];
+        for (const child of root.children) {
+          if (child.tagName === 'style' || child.tagName === 'defs') continue;
+          collectPaths(child, identity);
+        }
+
+        // Step 2: Assign each path to a cell based on bounding box center
+        // cellPaths[cellIndex] = [cmds, cmds, ...]
+        const cellPaths = {};
+        for (const cmds of allUserPaths) {
+          const b = getCmdsBounds(cmds);
+          if (b.w === 0 && b.h === 0) continue;
+          const cx = b.x + b.w / 2;
+          const cy = b.y + b.h / 2;
+          const col = Math.floor(cx / cellSize);
+          const row = Math.floor(cy / cellSize);
+          const cellIdx = row * cols + col;
+          if (cellIdx >= 0 && cellIdx < chars.length) {
+            if (!cellPaths[cellIdx]) cellPaths[cellIdx] = [];
+            cellPaths[cellIdx].push(cmds);
+          }
+        }
+
+        // Step 3: For each cell that has paths, transform to font space and import
         let importCount = 0;
-        // Find all path/shape elements that are NOT part of the template itself
-        // Strategy: look at each cell area for paths that aren't template guides
-        for (let i = 0; i < chars.length; i++) {
-          const col = i % cols;
-          const row = Math.floor(i / cols);
+        const lsb = this.project.defaultLsb || 50;
+        const rsb = this.project.defaultRsb || 50;
+        const scale = tFontH / cellSize;
+
+        for (const [idxStr, pathsList] of Object.entries(cellPaths)) {
+          const idx = parseInt(idxStr);
+          if (idx >= chars.length) continue;
+          const { char, unicode } = chars[idx];
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
           const cellX = col * cellSize;
           const cellY = row * cellSize;
-          const { char, unicode } = chars[i];
-          const uLabel = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')}`;
 
-          // Look for the glyph group or any paths in this cell area
-          const glyphGroup = doc.getElementById(`glyph-${uLabel}`);
-          let pathEls = [];
-          if (glyphGroup) {
-            pathEls = glyphGroup.querySelectorAll('path, rect, circle, ellipse, polygon, polyline');
-          }
-
-          // Also find any free-floating paths within this cell's bounding box
-          if (pathEls.length === 0) {
-            const allPaths = doc.querySelectorAll('path, polygon, polyline');
-            for (const p of allPaths) {
-              // Skip template elements (those with class)
-              if (p.getAttribute('class')) continue;
-              if (p.closest('style') || p.closest('defs')) continue;
-              const d = p.getAttribute('d') || p.getAttribute('points');
-              if (!d) continue;
-              let cmds;
-              if (p.tagName === 'path') {
-                cmds = parseSVGPath(d);
-              } else {
-                continue;
-              }
-              if (!cmds.length) continue;
-              const b = getCmdsBounds(cmds);
-              // Check if this path's center falls within this cell
-              const cx = b.x + b.w / 2;
-              const cy = b.y + b.h / 2;
-              if (cx >= cellX && cx < cellX + cellSize && cy >= cellY && cy < cellY + cellSize) {
-                pathEls = [p];
-                break;
-              }
-            }
-          }
-
-          if (pathEls.length === 0) continue;
-
-          // Extract and transform paths from cell space to font space
+          // Merge all paths in this cell
           let allCmds = [];
-          for (const p of pathEls) {
-            let cmds = [];
-            const localMatrix = getElementMatrix(p);
-            if (p.tagName === 'path') {
-              const d = p.getAttribute('d');
-              if (d) cmds = parseSVGPath(d);
-            } else if (p.tagName === 'rect') {
-              const rx = parseFloat(p.getAttribute('x') || 0), ry = parseFloat(p.getAttribute('y') || 0);
-              const rw = parseFloat(p.getAttribute('width') || 0), rh = parseFloat(p.getAttribute('height') || 0);
-              cmds = [{ type: 'M', x: rx, y: ry }, { type: 'L', x: rx + rw, y: ry }, { type: 'L', x: rx + rw, y: ry + rh }, { type: 'L', x: rx, y: ry + rh }, { type: 'Z' }];
-            } else if (p.tagName === 'circle') {
-              const ccx = parseFloat(p.getAttribute('cx') || 0), ccy = parseFloat(p.getAttribute('cy') || 0), r = parseFloat(p.getAttribute('r') || 0);
-              cmds = parseSVGPath(`M ${ccx - r} ${ccy} A ${r} ${r} 0 0 1 ${ccx + r} ${ccy} A ${r} ${r} 0 0 1 ${ccx - r} ${ccy} Z`);
-            } else if (p.tagName === 'ellipse') {
-              const ccx = parseFloat(p.getAttribute('cx') || 0), ccy = parseFloat(p.getAttribute('cy') || 0);
-              const erx = parseFloat(p.getAttribute('rx') || 0), ery = parseFloat(p.getAttribute('ry') || 0);
-              cmds = parseSVGPath(`M ${ccx - erx} ${ccy} A ${erx} ${ery} 0 0 1 ${ccx + erx} ${ccy} A ${erx} ${ery} 0 0 1 ${ccx - erx} ${ccy} Z`);
-            }
-            if (localMatrix) cmds = applyMatrix(cmds, localMatrix);
-            if (cmds.length) allCmds = allCmds.concat(cmds);
+          for (const cmds of pathsList) {
+            allCmds = allCmds.concat(cmds);
           }
-
-          if (!allCmds.length) continue;
 
           // Transform from cell SVG coordinates to font coordinates
-          // Cell: x in [cellX, cellX+cellSize], y: top=ascender, baseline at cellY + (ascender/fontH)*cellSize
-          const baseY = cellY + (tAscender / tFontH) * cellSize;
-          const scale = tFontH / cellSize; // cell pixels to font units
-          const lsb = this.project.defaultLsb || 50;
-
           const fitted = allCmds.map(c => {
             const pt = (px, py) => ({
-              x: (px - cellX) * scale + lsb - (tAscender - tAscender), // simplified: just offset from cell left
-              y: tAscender - (py - cellY) * scale, // flip Y: SVG top → font ascender
+              x: (px - cellX) * scale,
+              y: tAscender - (py - cellY) * scale,
             });
             if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, ...p }; }
             if (c.type === 'C') {
@@ -1423,20 +1447,17 @@ const App = {
             return { ...c };
           });
 
+          // Position with LSB
           const fittedB = getCmdsBounds(fitted);
-          // Center horizontally with lsb
           const dx = lsb - fittedB.x;
           const centeredCmds = transformCmds(fitted, dx, 0, 1, 1);
           const finalB = getCmdsBounds(centeredCmds);
-          const rsb = this.project.defaultRsb || 50;
           const aw = Math.round(finalB.x + finalB.w + rsb);
 
           this.project.glyphs[unicode] = {
-            unicode,
-            char,
+            unicode, char,
             advanceWidth: aw,
-            lsb: lsb,
-            rsb: rsb,
+            lsb, rsb,
             pathData: centeredCmds,
           };
           importCount++;
