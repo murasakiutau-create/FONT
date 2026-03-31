@@ -408,6 +408,67 @@ input[type=file].hidden-input { display: none; }
 }
 .kern-table tr:hover td { background: var(--bg4); }
 
+/* ─── Glyph Search ─────────────────────────────────────────────────────── */
+#glyph-search-wrap {
+  padding: 4px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#glyph-search {
+  width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  padding: 4px 6px; border-radius: 3px; font-size: 11px;
+}
+#glyph-search:focus { outline: none; border-color: var(--accent); }
+
+/* ─── Glyph Thumbnails ─────────────────────────────────────────────────── */
+.glyph-cell .glyph-thumb {
+  position: absolute; inset: 2px; pointer-events: none;
+}
+.glyph-cell .glyph-thumb svg { width: 100%; height: 100%; display: block; }
+
+/* ─── Validation results ───────────────────────────────────────────────── */
+.validation-item {
+  padding: 3px 4px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.validation-item:hover { background: var(--bg4); }
+.validation-char { font-weight: 700; margin-right: 4px; }
+.validation-issue { color: var(--text2); }
+
+/* ─── Ligature list ────────────────────────────────────────────────────── */
+.liga-item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.liga-item .liga-chars { font-weight: 700; min-width: 40px; }
+.liga-item .liga-unicode { font-family: monospace; font-size: 10px; color: var(--text2); flex: 1; }
+.liga-item .liga-del {
+  background: none; border: 1px solid var(--border); border-radius: 3px;
+  cursor: pointer; font-size: 10px; padding: 1px 5px; color: var(--text2);
+}
+.liga-item .liga-del:hover { border-color: var(--accent); color: var(--text); }
+
+/* ─── Custom guide list ────────────────────────────────────────────────── */
+.guide-item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.guide-item .guide-val { font-family: monospace; font-size: 11px; flex: 1; }
+.guide-item .guide-del {
+  background: none; border: 1px solid var(--border); border-radius: 3px;
+  cursor: pointer; font-size: 10px; padding: 1px 5px; color: var(--text2);
+}
+.guide-item .guide-del:hover { border-color: var(--accent); color: var(--text); }
+
+/* ─── Waterfall preview ────────────────────────────────────────────────── */
+.waterfall-line {
+  margin-bottom: 8px; white-space: pre;
+}
+.waterfall-label {
+  font-size: 10px; color: var(--text3); font-family: monospace; margin-right: 8px;
+  display: inline-block; min-width: 40px; text-align: right;
+}
+
+/* ─── Custom guide line in SVG ─────────────────────────────────────────── */
+.guide-custom { stroke: rgba(0,0,0,0.3); stroke-dasharray: 6 3; }
+
 /* ─── Responsive adjustments ────────────────────────────────────────────── */
 @media (max-width: 900px) {
   #left-panel { width: 150px; }

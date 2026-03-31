@@ -34,6 +34,11 @@ const App = {
     name: 'MyFont',
     style: 'Regular',
     description: '',
+    copyright: '',
+    license: '',
+    author: '',
+    authorUrl: '',
+    vendorUrl: '',
     upm: 1000,
     ascender: 800,
     descender: -200,
@@ -43,7 +48,9 @@ const App = {
     defaultRsb: 50,
     glyphs: {}, // unicode -> glyph object
     kerning: {}, // "u1,u2" -> value (kern pair)
+    ligatures: [], // [{chars: "fi", unicode: 64257}]
   },
+  clipboardGlyph: null, // for copy/paste
   editor: null,
   currentUnicode: null,
   activeRightTab: 'transform',
@@ -70,6 +77,7 @@ const App = {
     this._bindUIEvents();
     this._bindDropZone();
     this._bindKeyboard();
+    this._bindGlyphSearch();
     this.selectChar(65); // Start with 'A'
     this._updateSettingsForm();
 
@@ -152,6 +160,62 @@ const App = {
       }
       if (g.unicode === this.currentUnicode) cell.classList.add('active');
       else cell.classList.remove('active');
+    }
+    // Debounced thumbnail rendering
+    clearTimeout(this._thumbDebounce);
+    this._thumbDebounce = setTimeout(() => this._renderGlyphThumbnails(), 200);
+  },
+
+  // ─── Glyph Search ──────────────────────────────────────────────────────────
+
+  _bindGlyphSearch() {
+    const input = document.getElementById('glyph-search');
+    if (!input) return;
+    input.addEventListener('input', () => this._filterGlyphGrid(input.value.trim()));
+  },
+
+  _filterGlyphGrid(query) {
+    const q = query.toLowerCase();
+    for (const g of ALL_CHARS) {
+      const cell = document.getElementById(`gcell-${g.unicode}`);
+      if (!cell) continue;
+      if (!q) {
+        cell.style.display = '';
+        continue;
+      }
+      const charMatch = g.char.toLowerCase().includes(q);
+      const hexStr = g.unicode.toString(16).toLowerCase();
+      const unicodeMatch = hexStr.includes(q) || ('u+' + hexStr).includes(q) || g.unicode.toString().includes(q);
+      cell.style.display = (charMatch || unicodeMatch) ? '' : 'none';
+    }
+  },
+
+  // ─── Glyph Thumbnails ────────────────────────────────────────────────────────
+
+  _renderGlyphThumbnails() {
+    for (const g of ALL_CHARS) {
+      const cell = document.getElementById(`gcell-${g.unicode}`);
+      if (!cell) continue;
+      // Remove existing thumbnail
+      const existing = cell.querySelector('.glyph-thumb');
+      if (existing) existing.remove();
+      const glyphData = this.project.glyphs[g.unicode];
+      if (!glyphData || !glyphData.pathData || !glyphData.pathData.length) continue;
+      const d = cmdsToDString(glyphData.pathData);
+      if (!d) continue;
+      const b = getCmdsBounds(glyphData.pathData);
+      if (b.w === 0 && b.h === 0) continue;
+      // Create mini SVG
+      const wrap = document.createElement('div');
+      wrap.className = 'glyph-thumb';
+      const margin = 2;
+      const vx = b.x - margin;
+      const vy = b.y - margin;
+      const vw = b.w + margin * 2;
+      const vh = b.h + margin * 2;
+      // Font coords: Y up. We need to flip for SVG display.
+      wrap.innerHTML = `<svg viewBox="${vx} ${-b.y - b.h - margin} ${vw} ${vh}" preserveAspectRatio="xMidYMid meet"><g transform="scale(1,-1)"><path d="${d}" fill="#000" fill-rule="evenodd"/></g></svg>`;
+      cell.appendChild(wrap);
     }
   },
 
@@ -553,6 +617,12 @@ const App = {
         const tab = btn.dataset.tab;
         document.getElementById(`rtab-${tab}`)?.classList.add('active');
         this.activeRightTab = tab;
+        // Populate component select when transform tab opens
+        if (tab === 'transform') this._populateComponentSelect();
+        // Render ligature list when ligatures tab opens
+        if (tab === 'ligatures') this._renderLigatureList();
+        // Render custom guides list when view tab opens
+        if (tab === 'view') this._renderCustomGuidesList();
       });
     });
 
@@ -681,6 +751,46 @@ const App = {
       this._notify('パスの向きを逆にしました');
     });
 
+    // ── Boolean operations ──
+    document.getElementById('bool-union-btn')?.addEventListener('click', () => {
+      this._boolUnion();
+    });
+    document.getElementById('bool-subtract-btn')?.addEventListener('click', () => {
+      this._boolSubtract();
+    });
+    document.getElementById('bool-remove-overlap-btn')?.addEventListener('click', () => {
+      this._boolRemoveOverlap();
+    });
+
+    // ── Validation ──
+    document.getElementById('validate-btn')?.addEventListener('click', () => {
+      this._validateAllGlyphs();
+    });
+
+    // ── Copy/Paste buttons ──
+    document.getElementById('copy-glyph-btn')?.addEventListener('click', () => this._copyGlyph());
+    document.getElementById('paste-glyph-btn')?.addEventListener('click', () => this._pasteGlyph());
+
+    // ── Ligatures ──
+    document.getElementById('liga-add-btn')?.addEventListener('click', () => {
+      this._addLigature();
+    });
+
+    // ── Component/Reference glyphs ──
+    document.getElementById('component-add-btn')?.addEventListener('click', () => {
+      this._addComponentGlyph();
+    });
+
+    // ── Waterfall preview ──
+    document.getElementById('waterfall-btn')?.addEventListener('click', () => {
+      this._renderWaterfall();
+    });
+
+    // ── Custom Guidelines ──
+    document.getElementById('guide-add-btn')?.addEventListener('click', () => {
+      this._addCustomGuide();
+    });
+
     // ── Side Bearings ──
     document.getElementById('bearing-lsb')?.addEventListener('change', e => {
       this._setLSB(parseInt(e.target.value) || 0);
@@ -767,6 +877,11 @@ const App = {
       this.project.name = document.getElementById('s-name').value || 'MyFont';
       this.project.style = document.getElementById('s-style').value || 'Regular';
       this.project.description = document.getElementById('s-description').value || '';
+      this.project.copyright = document.getElementById('s-copyright').value || '';
+      this.project.license = document.getElementById('s-license').value || '';
+      this.project.author = document.getElementById('s-author').value || '';
+      this.project.authorUrl = document.getElementById('s-author-url').value || '';
+      this.project.vendorUrl = document.getElementById('s-vendor-url').value || '';
       this.project.upm = parseInt(document.getElementById('s-upm').value) || 1000;
       this.project.ascender = parseInt(document.getElementById('s-ascender').value) || 800;
       this.project.descender = parseInt(document.getElementById('s-descender').value) || -200;
@@ -835,6 +950,13 @@ const App = {
       // Ctrl+Z / Ctrl+Y work even in inputs
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); this._undo(); return; }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); this._redo(); return; }
+      // Copy/Paste (Ctrl+C / Ctrl+V) work even in inputs
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        e.preventDefault(); this._copyGlyph(); return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        e.preventDefault(); this._pasteGlyph(); return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowLeft') this._prevNextChar(-1);
       else if (e.key === 'ArrowRight') this._prevNextChar(1);
@@ -843,7 +965,60 @@ const App = {
       } else if (e.key === 'f' || e.key === 'F') this.editor.fitToView();
       else if (e.key === '+' || e.key === '=') { const z = Math.min(5, this.editor.zoom * 1.3); this.editor.setZoom(z); this._onZoomChange(z); }
       else if (e.key === '-') { const z = Math.max(0.05, this.editor.zoom / 1.3); this.editor.setZoom(z); this._onZoomChange(z); }
+      // Tool shortcuts
+      else if (e.key === 's' || e.key === 'S') this._setToolByKey('select');
+      else if (e.key === 'n' || e.key === 'N') this._setToolByKey('node');
+      else if (e.key === 'p' || e.key === 'P') this._setToolByKey('pen');
+      // Escape to cancel pen drawing
+      else if (e.key === 'Escape') {
+        if (this.editor.editMode === 'pen' && this.editor.penState) {
+          if (this.editor.penState.cmds.length > 1) {
+            this.editor._finalizePenPath();
+          } else {
+            this.editor.penState = null;
+            const old = this.editor.mainGroup.querySelector('#pen-preview');
+            if (old) old.remove();
+          }
+        }
+      }
     });
+  },
+
+  _setToolByKey(mode) {
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector(`.tool-btn[data-tool="${mode}"]`);
+    if (btn) btn.classList.add('active');
+    this.editor.setEditMode(mode);
+  },
+
+  // ─── Copy / Paste ───────────────────────────────────────────────────────────
+
+  _copyGlyph() {
+    if (this.currentUnicode == null) return;
+    this._saveCurrentGlyph();
+    const g = this.project.glyphs[this.currentUnicode];
+    if (g && g.pathData && g.pathData.length > 0) {
+      this.clipboardGlyph = JSON.parse(JSON.stringify(g));
+      this._notify('グリフをコピーしました');
+    } else {
+      this._notify('コピーするパスデータがありません', 'error');
+    }
+  },
+
+  _pasteGlyph() {
+    if (this.currentUnicode == null) return;
+    if (!this.clipboardGlyph) {
+      this._notify('クリップボードが空です', 'error');
+      return;
+    }
+    const pasted = JSON.parse(JSON.stringify(this.clipboardGlyph));
+    pasted.unicode = this.currentUnicode;
+    pasted.char = String.fromCodePoint(this.currentUnicode);
+    this.project.glyphs[this.currentUnicode] = pasted;
+    this.editor.loadGlyph(pasted);
+    document.getElementById('advance-width').value = pasted.advanceWidth;
+    this._refreshGlyphGrid();
+    this._notify('グリフを貼り付けました');
   },
 
   // ─── Preview ─────────────────────────────────────────────────────────────────
@@ -934,6 +1109,11 @@ const App = {
     set('s-name', this.project.name);
     set('s-style', this.project.style);
     set('s-description', this.project.description || '');
+    set('s-copyright', this.project.copyright || '');
+    set('s-license', this.project.license || '');
+    set('s-author', this.project.author || '');
+    set('s-author-url', this.project.authorUrl || '');
+    set('s-vendor-url', this.project.vendorUrl || '');
     set('s-upm', this.project.upm);
     set('s-ascender', this.project.ascender);
     set('s-descender', this.project.descender);
@@ -1231,6 +1411,308 @@ const App = {
       const tr = document.createElement('tr');
       tr.innerHTML = `<td colspan="3" style="color:var(--text3);text-align:center">…他 ${pairs.length - 50}ペア</td>`;
       tbody.appendChild(tr);
+    }
+  },
+
+  // ─── Boolean Operations ──────────────────────────────────────────────────────
+
+  _boolUnion() {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    // Union: combine all subpaths using evenodd fill rule (already displayed that way)
+    // Flatten all subpaths into one continuous path array (already the storage format)
+    // Ensure all subpaths are closed
+    const cmds = this.editor.glyph.pathData;
+    const subs = splitSubpaths(cmds);
+    const result = [];
+    for (const sub of subs) {
+      for (const c of sub.cmds) result.push(c);
+      if (!sub.closed) result.push({ type: 'Z' });
+    }
+    this.editor.updatePathData(result);
+    this._notify('合体 (Union) を適用しました');
+  },
+
+  _boolSubtract() {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    const cmds = this.editor.glyph.pathData;
+    const subs = splitSubpaths(cmds);
+    if (subs.length < 2) { this._notify('2つ以上のサブパスが必要です', 'error'); return; }
+    // Keep first subpath, reverse all subsequent ones (subtract = reverse winding of front paths)
+    const result = [];
+    for (let i = 0; i < subs.length; i++) {
+      if (i === 0) {
+        for (const c of subs[i].cmds) result.push(c);
+        if (!subs[i].closed) result.push({ type: 'Z' });
+      } else {
+        const reversed = reverseCmds(subs[i].cmds);
+        for (const c of reversed) result.push(c);
+        if (!subs[i].closed) result.push({ type: 'Z' });
+      }
+    }
+    this.editor.updatePathData(result);
+    this._notify('前面を削除 (Subtract) を適用しました');
+  },
+
+  _boolRemoveOverlap() {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    // Flatten: ensure consistent winding then combine
+    const cmds = this.editor.glyph.pathData;
+    const subs = splitSubpaths(cmds);
+    const result = [];
+    for (const sub of subs) {
+      const area = windingArea(sub.cmds);
+      let subCmds = sub.cmds;
+      // Ensure consistent clockwise winding (positive area in font coords)
+      if (area < 0) {
+        subCmds = reverseCmds(subCmds);
+      }
+      for (const c of subCmds) result.push(c);
+      if (!sub.closed) result.push({ type: 'Z' });
+    }
+    this.editor.updatePathData(cleanupCmds(result));
+    this._notify('オーバーラップ除去を適用しました');
+  },
+
+  // ─── Font Validation ────────────────────────────────────────────────────────
+
+  _validateAllGlyphs() {
+    this._saveCurrentGlyph();
+    const results = [];
+    for (const [unicodeStr, glyph] of Object.entries(this.project.glyphs)) {
+      const unicode = parseInt(unicodeStr);
+      const char = String.fromCodePoint(unicode);
+      if (!glyph.pathData || !glyph.pathData.length) continue;
+      const cmds = glyph.pathData;
+      const subs = splitSubpaths(cmds);
+      // Check open paths
+      for (let i = 0; i < subs.length; i++) {
+        if (!subs[i].closed) {
+          results.push({ unicode, char, issue: `サブパス${i + 1}: 開いたパス (Zが不足)` });
+        }
+      }
+      // Check duplicate points
+      let px = null, py = null;
+      for (let i = 0; i < cmds.length; i++) {
+        const c = cmds[i];
+        if (c.type === 'Z') { px = null; py = null; continue; }
+        if (c.x !== undefined && px !== null) {
+          if (Math.abs(c.x - px) < 0.1 && Math.abs(c.y - py) < 0.1) {
+            results.push({ unicode, char, issue: `ポイント${i}: 重複点` });
+          }
+        }
+        if (c.x !== undefined) { px = c.x; py = c.y; }
+      }
+      // Check winding direction
+      for (let i = 0; i < subs.length; i++) {
+        const area = windingArea(subs[i].cmds);
+        if (area < 0) {
+          results.push({ unicode, char, issue: `サブパス${i + 1}: 逆方向の巻き` });
+        }
+      }
+      // Check very small segments
+      let prevX = 0, prevY = 0;
+      for (const c of cmds) {
+        if (c.type === 'M') { prevX = c.x; prevY = c.y; continue; }
+        if (c.type === 'Z') continue;
+        if (c.x !== undefined) {
+          const dist = Math.sqrt((c.x - prevX) ** 2 + (c.y - prevY) ** 2);
+          if (dist < 1 && dist > 0) {
+            results.push({ unicode, char, issue: `非常に小さいセグメント (${dist.toFixed(2)}u)` });
+          }
+          prevX = c.x; prevY = c.y;
+        }
+      }
+    }
+    // Render results
+    const container = document.getElementById('validation-results');
+    if (!container) return;
+    container.innerHTML = '';
+    if (results.length === 0) {
+      container.innerHTML = '<div style="color:var(--text3);padding:6px">問題は見つかりませんでした ✓</div>';
+      this._notify('バリデーション完了: 問題なし');
+      return;
+    }
+    for (const r of results) {
+      const div = document.createElement('div');
+      div.className = 'validation-item';
+      div.innerHTML = `<span class="validation-char">${r.char}</span><span class="validation-issue">${r.issue}</span>`;
+      div.addEventListener('click', () => this.selectChar(r.unicode));
+      container.appendChild(div);
+    }
+    this._notify(`${results.length}件の問題が見つかりました`);
+  },
+
+  // ─── Ligatures ──────────────────────────────────────────────────────────────
+
+  _addLigature() {
+    const charsInput = document.getElementById('liga-chars');
+    const unicodeInput = document.getElementById('liga-unicode');
+    if (!charsInput || !unicodeInput) return;
+    const chars = charsInput.value.trim();
+    const unicode = parseInt(unicodeInput.value);
+    if (!chars || chars.length < 2) {
+      this._notify('2文字以上の文字列を入力してください', 'error');
+      return;
+    }
+    if (!unicode || isNaN(unicode)) {
+      this._notify('有効なUnicodeコードポイントを入力してください', 'error');
+      return;
+    }
+    if (!this.project.ligatures) this.project.ligatures = [];
+    // Check for duplicates
+    if (this.project.ligatures.some(l => l.chars === chars)) {
+      this._notify('この文字列のリガチャは既に存在します', 'error');
+      return;
+    }
+    this.project.ligatures.push({ chars, unicode });
+    charsInput.value = '';
+    unicodeInput.value = '';
+    this._renderLigatureList();
+    this._notify(`リガチャ "${chars}" を追加しました`);
+  },
+
+  _renderLigatureList() {
+    const container = document.getElementById('liga-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!this.project.ligatures || !this.project.ligatures.length) {
+      container.innerHTML = '<div style="color:var(--text3);padding:4px">リガチャなし</div>';
+      return;
+    }
+    for (let i = 0; i < this.project.ligatures.length; i++) {
+      const liga = this.project.ligatures[i];
+      const item = document.createElement('div');
+      item.className = 'liga-item';
+      item.innerHTML = `<span class="liga-chars">${liga.chars}</span><span class="liga-unicode">U+${liga.unicode.toString(16).toUpperCase().padStart(4, '0')}</span>`;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'liga-del';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', () => {
+        this.project.ligatures.splice(i, 1);
+        this._renderLigatureList();
+        this._notify('リガチャを削除しました');
+      });
+      item.appendChild(delBtn);
+      container.appendChild(item);
+    }
+  },
+
+  // ─── Waterfall Preview ──────────────────────────────────────────────────────
+
+  _renderWaterfall() {
+    if (!this.previewFontFamily) {
+      this._loadFontForPreview();
+      // Wait for font to load then render waterfall
+      setTimeout(() => this._renderWaterfallDisplay(), 500);
+      return;
+    }
+    this._renderWaterfallDisplay();
+  },
+
+  _renderWaterfallDisplay() {
+    const container = document.getElementById('preview-display');
+    if (!container) return;
+    const text = document.getElementById('preview-text')?.value || 'The quick brown fox jumps over the lazy dog';
+    const bg = document.getElementById('preview-bg')?.value || 'white';
+    container.style.backgroundColor = bg === 'black' ? '#111' : bg === 'gray' ? '#888' : '#fff';
+    container.style.color = bg === 'black' ? '#fff' : '#000';
+    container.innerHTML = '';
+    const sizes = [12, 16, 20, 24, 32, 48, 72, 96];
+    const firstLine = text.split('\n')[0] || text;
+    for (const size of sizes) {
+      const row = document.createElement('div');
+      row.className = 'waterfall-line';
+      const label = document.createElement('span');
+      label.className = 'waterfall-label';
+      label.textContent = size + 'px';
+      row.appendChild(label);
+      const span = document.createElement('span');
+      span.style.fontFamily = this.previewFontFamily ? `'${this.previewFontFamily}', sans-serif` : 'sans-serif';
+      span.style.fontSize = size + 'px';
+      span.style.lineHeight = '1.3';
+      span.textContent = firstLine;
+      row.appendChild(span);
+      container.appendChild(row);
+    }
+    this._notify('ウォーターフォールプレビューを表示しました');
+  },
+
+  // ─── Component/Reference Glyphs ─────────────────────────────────────────────
+
+  _populateComponentSelect() {
+    const select = document.getElementById('component-glyph-select');
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '<option value="">グリフを選択...</option>';
+    for (const g of ALL_CHARS) {
+      if (this.project.glyphs[g.unicode] && this.project.glyphs[g.unicode].pathData && this.project.glyphs[g.unicode].pathData.length > 0) {
+        const opt = document.createElement('option');
+        opt.value = g.unicode;
+        opt.textContent = `${g.char} (U+${g.unicode.toString(16).toUpperCase().padStart(4, '0')})`;
+        select.appendChild(opt);
+      }
+    }
+    if (current) select.value = current;
+  },
+
+  _addComponentGlyph() {
+    const select = document.getElementById('component-glyph-select');
+    if (!select || !select.value) { this._notify('グリフを選択してください', 'error'); return; }
+    const srcUnicode = parseInt(select.value);
+    const srcGlyph = this.project.glyphs[srcUnicode];
+    if (!srcGlyph || !srcGlyph.pathData || !srcGlyph.pathData.length) {
+      this._notify('選択されたグリフにパスデータがありません', 'error');
+      return;
+    }
+    if (!this.editor || !this.editor.glyph) return;
+    // Copy paths from source glyph into current glyph
+    const copiedPaths = JSON.parse(JSON.stringify(srcGlyph.pathData));
+    this.editor.glyph.pathData = this.editor.glyph.pathData.concat(copiedPaths);
+    this.editor.render();
+    this.editor._notifyBBox();
+    this.editor._notifyChange();
+    this._notify(`"${String.fromCodePoint(srcUnicode)}" のパスを参照追加しました`);
+  },
+
+  // ─── Custom Guidelines ──────────────────────────────────────────────────────
+
+  _addCustomGuide() {
+    const input = document.getElementById('guide-y-input');
+    if (!input) return;
+    const y = parseFloat(input.value);
+    if (isNaN(y)) { this._notify('Y座標を入力してください', 'error'); return; }
+    if (!this.editor.customGuides) this.editor.customGuides = [];
+    if (this.editor.customGuides.includes(y)) { this._notify('このガイドラインは既に存在します', 'error'); return; }
+    this.editor.customGuides.push(y);
+    input.value = '';
+    this.editor.render();
+    this._renderCustomGuidesList();
+    this._notify(`Y=${y} にガイドラインを追加しました`);
+  },
+
+  _renderCustomGuidesList() {
+    const container = document.getElementById('custom-guides-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!this.editor.customGuides || !this.editor.customGuides.length) {
+      container.innerHTML = '<div style="color:var(--text3);padding:4px">ガイドラインなし</div>';
+      return;
+    }
+    for (let i = 0; i < this.editor.customGuides.length; i++) {
+      const y = this.editor.customGuides[i];
+      const item = document.createElement('div');
+      item.className = 'guide-item';
+      item.innerHTML = `<span class="guide-val">Y = ${y}</span>`;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'guide-del';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', () => {
+        this.editor.customGuides.splice(i, 1);
+        this.editor.render();
+        this._renderCustomGuidesList();
+      });
+      item.appendChild(delBtn);
+      container.appendChild(item);
     }
   },
 

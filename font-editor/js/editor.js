@@ -21,7 +21,7 @@ class GlyphEditor {
     this.zoom = 0.5;
     this.panX = 60;
     this.panY = 40;
-    this.editMode = 'select'; // 'select' | 'node' | 'move'
+    this.editMode = 'select'; // 'select' | 'node' | 'pen' | 'move'
     this.selectedPath = -1;   // index into glyph.pathData
     this.selectedNode = -1;   // index within subpath
     this.selectedHandle = null; // {nodeIdx, side: 'cp1'|'cp2'}
@@ -29,6 +29,9 @@ class GlyphEditor {
     this.referenceFont = 'serif';
     this.showHandles = true;
     this.dragState = null;
+    this.customGuides = [];   // array of Y values for custom guidelines
+    // Pen tool state
+    this.penState = null;     // { cmds: [], firstPoint: {x,y}, dragging: false, dragStart: {x,y} }
 
     this._buildLayers();
     this._bindEvents();
@@ -106,6 +109,9 @@ class GlyphEditor {
     this.selectedPath = -1;
     this.selectedNode = -1;
     this.selectedHandle = null;
+    this.penState = null;
+    const penPreview = this.mainGroup?.querySelector('#pen-preview');
+    if (penPreview) penPreview.remove();
     this.fitToView();
     this.render();
     this._notifyBBox();
@@ -196,6 +202,22 @@ class GlyphEditor {
     const sx0 = this.fontToScreen(0, 0).x;
     const lsb = this._el('line', { x1: sx0, y1: 0, x2: sx0, y2: H, class: 'guide-line guide-lsb' });
     this.gridLayer.appendChild(lsb);
+
+    // Custom guidelines
+    if (this.customGuides && this.customGuides.length) {
+      for (const gy of this.customGuides) {
+        const sy = this.fontToScreen(0, gy).y;
+        const gLine = this._el('line', { x1: 0, y1: sy, x2: W, y2: sy, class: 'guide-line guide-custom' });
+        this.gridLayer.appendChild(gLine);
+        const gLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        gLabel.setAttribute('x', W - 4);
+        gLabel.setAttribute('y', sy - 3);
+        gLabel.setAttribute('class', 'guide-label');
+        gLabel.setAttribute('text-anchor', 'end');
+        gLabel.textContent = gy;
+        this.gridLayer.appendChild(gLabel);
+      }
+    }
   }
 
   _renderReference() {
@@ -244,7 +266,7 @@ class GlyphEditor {
 
   _renderNodes() {
     this.nodesLayer.innerHTML = '';
-    if (this.editMode === 'move' || !this.glyph || !this.glyph.pathData) return;
+    if (this.editMode === 'move' || this.editMode === 'pen' || !this.glyph || !this.glyph.pathData) return;
     const cmds = this.glyph.pathData;
     const nR = 5 / this.zoom;    // node radius in font units
     const hR = 3.5 / this.zoom;  // handle radius
@@ -328,12 +350,17 @@ class GlyphEditor {
   }
 
   _onMousedown(e) {
-    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer')) {
+    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer') || e.target.closest('#nodes-layer')) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
       if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
         this.dragState = { type: 'pan', startSx: sx, startSy: sy, startPanX: this.panX, startPanY: this.panY };
         e.preventDefault(); return;
+      }
+      // Pen tool handling
+      if (this.editMode === 'pen' && e.button === 0) {
+        this._penMousedown(fp, e);
+        return;
       }
       if (this.editMode === 'select' || this.editMode === 'node') {
         // Check if clicking on the glyph path for move (select mode only)
@@ -372,6 +399,15 @@ class GlyphEditor {
   }
 
   _onMousemove(e) {
+    // Pen tool preview
+    if (this.editMode === 'pen') {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      if (this.penState && this.penState.dragging && this.penState.pendingPoint) {
+        // dragging to create curve handle
+      }
+      this._penMousemove(fp);
+    }
     if (!this.dragState) return;
     const { sx, sy } = this._getEventPos(e);
     const ds = this.dragState;
@@ -453,7 +489,143 @@ class GlyphEditor {
   }
 
   _onMouseup(e) {
+    if (this.editMode === 'pen' && this.penState && this.penState.dragging) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      this._penMouseup(fp);
+    }
     this.dragState = null;
+  }
+
+  // ─── Pen Tool ───────────────────────────────────────────────────────────────
+
+  _penMousedown(fp, e) {
+    if (!this.glyph) return;
+    const closeDist = 12 / this.zoom;
+    if (!this.penState) {
+      // Start a new subpath
+      this.penState = { cmds: [{ type: 'M', x: fp.x, y: fp.y }], firstPoint: { x: fp.x, y: fp.y }, dragging: true, dragStart: { x: fp.x, y: fp.y }, lastCp: null };
+      this._renderPenPreview();
+      return;
+    }
+    // Check if clicking near first point to close
+    const dx = fp.x - this.penState.firstPoint.x;
+    const dy = fp.y - this.penState.firstPoint.y;
+    if (this.penState.cmds.length > 2 && Math.sqrt(dx * dx + dy * dy) < closeDist) {
+      // Close the path
+      this.penState.cmds.push({ type: 'Z' });
+      this._finalizePenPath();
+      return;
+    }
+    // Add a new point (will determine line vs curve on mouseup based on drag)
+    this.penState.dragging = true;
+    this.penState.dragStart = { x: fp.x, y: fp.y };
+    this.penState.pendingPoint = { x: fp.x, y: fp.y };
+  }
+
+  _penMousemove(fp) {
+    if (!this.penState) return;
+    if (this.penState.dragging && this.penState.pendingPoint) {
+      // Show preview of curve handle
+      this._renderPenPreview(fp);
+    } else {
+      // Show preview line to cursor
+      this._renderPenPreview(fp);
+    }
+  }
+
+  _penMouseup(fp) {
+    if (!this.penState || !this.penState.dragging) return;
+    if (!this.penState.pendingPoint) {
+      // First point drag - record the outgoing handle for next segment
+      const dx = fp.x - this.penState.dragStart.x;
+      const dy = fp.y - this.penState.dragStart.y;
+      if (Math.abs(dx) > 2 / this.zoom || Math.abs(dy) > 2 / this.zoom) {
+        this.penState.lastCp = { x: fp.x, y: fp.y };
+      }
+      this.penState.dragging = false;
+      this._renderPenPreview();
+      return;
+    }
+    const pp = this.penState.pendingPoint;
+    const dx = fp.x - pp.x;
+    const dy = fp.y - pp.y;
+    const dragged = Math.abs(dx) > 2 / this.zoom || Math.abs(dy) > 2 / this.zoom;
+    if (dragged) {
+      // Curve: compute cp1 from lastCp reflection, cp2 from drag
+      const cp2x = 2 * pp.x - fp.x;
+      const cp2y = 2 * pp.y - fp.y;
+      let cp1x, cp1y;
+      if (this.penState.lastCp) {
+        cp1x = this.penState.lastCp.x;
+        cp1y = this.penState.lastCp.y;
+      } else {
+        // No previous handle, use the previous point
+        const prevCmds = this.penState.cmds;
+        const lastCmd = prevCmds[prevCmds.length - 1];
+        const prevPt = lastCmd.type === 'C' ? { x: lastCmd.x, y: lastCmd.y } : { x: lastCmd.x, y: lastCmd.y };
+        cp1x = prevPt.x;
+        cp1y = prevPt.y;
+      }
+      this.penState.cmds.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x: pp.x, y: pp.y });
+      this.penState.lastCp = { x: fp.x, y: fp.y };
+    } else {
+      // Line segment
+      this.penState.cmds.push({ type: 'L', x: pp.x, y: pp.y });
+      this.penState.lastCp = null;
+    }
+    this.penState.pendingPoint = null;
+    this.penState.dragging = false;
+    this._renderPenPreview();
+  }
+
+  _finalizePenPath() {
+    if (!this.penState || !this.glyph) return;
+    const newCmds = this.penState.cmds;
+    this.glyph.pathData = this.glyph.pathData.concat(newCmds);
+    this.penState = null;
+    this.render();
+    this._notifyBBox();
+    this._notifyChange();
+  }
+
+  _renderPenPreview(cursorFp) {
+    // Remove old preview
+    const old = this.mainGroup.querySelector('#pen-preview');
+    if (old) old.remove();
+    if (!this.penState) return;
+    const g = this._el('g', { id: 'pen-preview' });
+    const sw = 1.5 / this.zoom;
+    const nR = 4 / this.zoom;
+    // Draw existing pen path segments
+    if (this.penState.cmds.length > 0) {
+      const d = cmdsToDString(this.penState.cmds);
+      const path = this._el('path', { d, fill: 'none', stroke: '#000', 'stroke-width': String(sw), 'stroke-dasharray': `${4/this.zoom},${3/this.zoom}` });
+      g.appendChild(path);
+    }
+    // Draw dots at each point
+    for (const c of this.penState.cmds) {
+      if (c.type === 'M' || c.type === 'L' || c.type === 'C') {
+        const dot = this._el('circle', { cx: c.x, cy: c.y, r: nR, fill: '#000', stroke: 'none' });
+        g.appendChild(dot);
+      }
+    }
+    // First point indicator (larger)
+    if (this.penState.firstPoint) {
+      const fp = this.penState.firstPoint;
+      const ring = this._el('circle', { cx: fp.x, cy: fp.y, r: nR * 1.5, fill: 'none', stroke: '#000', 'stroke-width': String(sw) });
+      g.appendChild(ring);
+    }
+    // Preview line from last point to cursor
+    if (cursorFp && this.penState.cmds.length > 0) {
+      const lastCmd = this.penState.cmds[this.penState.cmds.length - 1];
+      if (lastCmd.type !== 'Z') {
+        const lx = lastCmd.x, ly = lastCmd.y;
+        const line = this._el('line', { x1: lx, y1: ly, x2: cursorFp.x, y2: cursorFp.y, stroke: '#666', 'stroke-width': String(sw), 'stroke-dasharray': `${3/this.zoom},${2/this.zoom}` });
+        g.appendChild(line);
+      }
+    }
+    this.mainGroup.appendChild(g);
   }
 
   _onWheel(e) {
@@ -656,8 +828,18 @@ class GlyphEditor {
   // ─── Settings ─────────────────────────────────────────────────────────────
 
   setEditMode(mode) {
+    // If leaving pen mode, finalize any in-progress path
+    if (this.editMode === 'pen' && mode !== 'pen' && this.penState) {
+      if (this.penState.cmds.length > 1) {
+        this._finalizePenPath();
+      } else {
+        this.penState = null;
+        const old = this.mainGroup.querySelector('#pen-preview');
+        if (old) old.remove();
+      }
+    }
     this.editMode = mode;
-    this.svg.style.cursor = 'default';
+    this.svg.style.cursor = mode === 'pen' ? 'crosshair' : 'default';
     this.render();
   }
 
