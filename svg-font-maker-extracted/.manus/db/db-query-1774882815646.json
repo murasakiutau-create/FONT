@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, unicode, `char`, svgUrl, width FROM glyphs WHERE unicode = 12356 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3fbbMW4piKqGCVB.b48be9658793 --database Cwdp24ARGfiSddacai8GsZ --execute SELECT id, unicode, `char`, svgUrl, width FROM glyphs WHERE unicode = 12356 LIMIT 5;",
+  "rows": [
+    {
+      "id": "150003",
+      "unicode": "12356",
+      "char": "い",
+      "svgUrl": "https://d2xsxph8kpxj0f.cloudfront.net/310519663284989987/Cwdp24ARGfiSddacai8GsZ/glyphs/1/30001/uni3044-iFE1U9wQ.svg",
+      "width": "600"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tunicode\tchar\tsvgUrl\twidth\n150003\t12356\tい\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663284989987/Cwdp24ARGfiSddacai8GsZ/glyphs/1/30001/uni3044-iFE1U9wQ.svg\t600\n",
+  "stderr": "",
+  "execution_time_ms": 1607
+}

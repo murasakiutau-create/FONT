@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `font_projects` ADD `defaultLsb` int DEFAULT 50 NOT NULL;\nALTER TABLE `font_projects` ADD `defaultRsb` int DEFAULT 50 NOT NULL;\nALTER TABLE `glyphs` ADD `lsb` int;\nALTER TABLE `glyphs` ADD `rsb` int;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3fbbMW4piKqGCVB.b48be9658793 --database Cwdp24ARGfiSddacai8GsZ --execute ALTER TABLE `font_projects` ADD `defaultLsb` int DEFAULT 50 NOT NULL;\nALTER TABLE `font_projects` ADD `defaultRsb` int DEFAULT 50 NOT NULL;\nALTER TABLE `glyphs` ADD `lsb` int;\nALTER TABLE `glyphs` ADD `rsb` int;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2146
+}
