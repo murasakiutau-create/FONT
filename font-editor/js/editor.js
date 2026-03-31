@@ -59,7 +59,7 @@ class GlyphEditor {
     this.mainGroup.appendChild(this.pathsLayer);
 
     // Advance width line (in main group)
-    this.awLine = this._el('line', { id: 'aw-line', 'stroke': '#e94560', 'stroke-width': '1', 'stroke-dasharray': '4,4', opacity: '0.5' });
+    this.awLine = this._el('line', { id: 'aw-line', 'stroke': '#000', 'stroke-width': '1', 'stroke-dasharray': '4,4', opacity: '0.4' });
     this.mainGroup.appendChild(this.awLine);
 
     // Nodes layer (inside main group, compensated sizes)
@@ -210,7 +210,7 @@ class GlyphEditor {
     text.setAttribute('dominant-baseline', 'alphabetic');
     text.setAttribute('font-size', fontH);
     text.setAttribute('font-family', this.referenceFont);
-    text.setAttribute('fill', '#8888cc');
+    text.setAttribute('fill', '#cccccc');
     text.textContent = this.glyph.char;
     g.appendChild(text);
     this.refLayer.appendChild(g);
@@ -226,11 +226,11 @@ class GlyphEditor {
     const d = cmdsToDString(pathData);
     const pathEl = this._el('path', {
       d,
-      fill: '#ddeeff',
+      fill: '#e0e0e0',
       'fill-rule': 'evenodd',
-      stroke: '#4fc3f7',
+      stroke: '#000000',
       'stroke-width': String(1 / this.zoom),
-      opacity: '0.85',
+      opacity: '0.9',
       class: 'glyph-path',
     });
     this.pathsLayer.appendChild(pathEl);
@@ -267,7 +267,7 @@ class GlyphEditor {
       if (this.showHandles) {
         for (const p of pts) {
           if (p.type === 'handle') {
-            const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#81d4fa', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
+            const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#888', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
             this.nodesLayer.appendChild(line);
           }
         }
@@ -275,7 +275,7 @@ class GlyphEditor {
         for (const p of pts) {
           if (p.type === 'handle') {
             const isSel = this.selectedHandle && this.selectedHandle.cmdIdx === p.cmdIdx && this.selectedHandle.side === p.side;
-            const circle = this._el('circle', { cx: p.hx, cy: p.hy, r: hR, fill: 'none', stroke: isSel ? '#ffcc02' : '#81d4fa', 'stroke-width': sw, cursor: 'move', 'data-cmd': p.cmdIdx, 'data-side': p.side });
+            const circle = this._el('circle', { cx: p.hx, cy: p.hy, r: hR, fill: 'none', stroke: isSel ? '#000' : '#888', 'stroke-width': sw, cursor: 'move', 'data-cmd': p.cmdIdx, 'data-side': p.side });
             circle.addEventListener('mousedown', e => this._handleHandleMousedown(e, p.cmdIdx, p.side));
             this.nodesLayer.appendChild(circle);
           }
@@ -286,7 +286,7 @@ class GlyphEditor {
       for (const p of pts) {
         if (p.type === 'anchor') {
           const isSel = this.selectedNode === p.cmdIdx;
-          const circle = this._el('circle', { cx: p.x, cy: p.y, r: nR, fill: isSel ? '#ffcc02' : '#4fc3f7', stroke: '#0a0a1a', 'stroke-width': sw * 1.5, cursor: 'move', 'data-cmd': p.cmdIdx });
+          const circle = this._el('circle', { cx: p.x, cy: p.y, r: nR, fill: isSel ? '#000' : '#fff', stroke: '#000', 'stroke-width': sw * 1.5, cursor: 'move', 'data-cmd': p.cmdIdx });
           circle.addEventListener('mousedown', e => this._handleNodeMousedown(e, p.cmdIdx));
           this.nodesLayer.appendChild(circle);
         }
