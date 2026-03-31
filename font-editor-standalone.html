@@ -1,0 +1,2774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Font Editor — SVG to TTF</title>
+  <style>
+/* ─── CSS Variables ─────────────────────────────────────────────────────── */
+:root {
+  --bg: #0f0f1a;
+  --bg2: #16162a;
+  --bg3: #1e1e35;
+  --bg4: #252542;
+  --border: #2e2e52;
+  --accent: #e94560;
+  --accent2: #7c5cbf;
+  --text: #e8e8f0;
+  --text2: #9090b8;
+  --text3: #5555aa;
+  --node-color: #4fc3f7;
+  --handle-color: #81d4fa;
+  --sel-color: #ffcc02;
+  --guide-baseline: rgba(233,69,96,0.6);
+  --guide-xheight: rgba(79,195,247,0.4);
+  --guide-capheight: rgba(129,212,74,0.4);
+  --guide-ascender: rgba(255,204,2,0.3);
+  --guide-descender: rgba(255,152,0,0.3);
+  --shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
+input, button, select, textarea { font-family: inherit; font-size: inherit; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ─── App Shell ─────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; user-select: none; }
+
+/* ─── Header ────────────────────────────────────────────────────────────── */
+#header {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0 12px; height: 44px; flex-shrink: 0; z-index: 100;
+}
+#header .logo {
+  font-size: 16px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--accent); white-space: nowrap; margin-right: 4px;
+}
+#header .sep { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+#font-name-display { font-size: 14px; font-weight: 600; color: var(--text2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  transition: all 0.15s;
+}
+.header-btn:hover { background: var(--bg4); border-color: var(--accent); }
+.header-btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.header-btn.accent:hover { filter: brightness(1.15); }
+.header-btn.secondary { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.header-btn.secondary:hover { filter: brightness(1.15); }
+.header-btn svg { width: 14px; height: 14px; }
+
+/* ─── Main Layout ────────────────────────────────────────────────────────── */
+#main-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ─── Main tabs (Editor / Preview) ─────────────────────────────────────── */
+.main-tab-btn {
+  background: transparent; color: var(--text2); border: none;
+  padding: 8px 16px; cursor: pointer; font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.main-tab-btn:hover { color: var(--text); }
+.main-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ─── Left Panel (Glyph Grid) ───────────────────────────────────────────── */
+#left-panel {
+  width: 200px; flex-shrink: 0;
+  background: var(--bg2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-title {
+  padding: 8px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--text3); border-bottom: 1px solid var(--border);
+  background: var(--bg2); flex-shrink: 0;
+}
+#glyph-grid { flex: 1; overflow-y: auto; padding: 6px 4px; }
+.glyph-group-header {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text3); padding: 6px 4px 3px; margin-top: 4px;
+}
+.glyph-row { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 2px; }
+.glyph-cell {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 3px;
+  cursor: pointer; position: relative; transition: all 0.12s; overflow: hidden;
+}
+.glyph-cell:hover { background: var(--bg4); border-color: var(--accent2); }
+.glyph-cell.active { border-color: var(--accent); background: rgba(233,69,96,0.15); }
+.glyph-cell.has-glyph { border-color: var(--node-color); }
+.glyph-cell.has-glyph.active { border-color: var(--accent); }
+.glyph-cell.drag-over { border-color: var(--accent); background: rgba(233,69,96,0.25); }
+.glyph-char { font-size: 18px; color: var(--text2); line-height: 1; }
+.glyph-cell.active .glyph-char { color: var(--text); }
+.glyph-badge { position: absolute; bottom: 1px; right: 2px; font-size: 6px; color: var(--node-color); line-height: 1; }
+
+/* ─── Center Panel ──────────────────────────────────────────────────────── */
+#center-panel {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg);
+}
+
+/* Tab bar row */
+#tab-row {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  flex-shrink: 0; height: 36px;
+}
+
+/* Toolbar */
+#toolbar {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg2); border-bottom: 1px solid var(--border);
+  padding: 0 10px; height: 38px; flex-shrink: 0;
+}
+.tool-btn {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  background: transparent; color: var(--text2); border: 1px solid transparent;
+  border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.12s;
+}
+.tool-btn:hover { background: var(--bg4); color: var(--text); }
+.tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.tool-btn svg { width: 15px; height: 15px; }
+.tb-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
+.zoom-group { display: flex; align-items: center; gap: 4px; }
+.zoom-btn {
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  border-radius: 3px; cursor: pointer; font-size: 16px; font-weight: bold;
+  transition: all 0.12s; line-height: 1; flex-shrink: 0;
+}
+.zoom-btn:hover { background: var(--bg4); border-color: var(--accent); }
+#zoom-slider { width: 80px; accent-color: var(--accent); cursor: pointer; }
+#zoom-label { font-size: 11px; color: var(--text2); min-width: 38px; font-family: monospace; }
+.tb-flex { flex: 1; }
+.glyph-nav { display: flex; align-items: center; gap: 4px; }
+.nav-btn {
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  border-radius: 3px; cursor: pointer; font-size: 14px; transition: all 0.12s;
+}
+.nav-btn:hover:not(:disabled) { background: var(--bg4); border-color: var(--accent); }
+.nav-btn:disabled { opacity: 0.3; cursor: default; }
+#current-char-label { font-size: 20px; font-weight: bold; color: var(--text); min-width: 22px; text-align: center; }
+#current-unicode-label { font-size: 10px; color: var(--text2); font-family: monospace; }
+
+/* Editor container */
+#editor-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#preview-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; display: none; }
+#editor-container {
+  flex: 1; position: relative; overflow: hidden; background: #0c0c18;
+  cursor: default;
+}
+#editor-container.drag-over { outline: 2px dashed var(--accent); outline-offset: -4px; }
+#editor-svg { width: 100%; height: 100%; display: block; }
+
+/* SVG guide styles */
+.guide-line { stroke-width: 1; }
+.guide-ascender { stroke: var(--guide-ascender); stroke-dasharray: 4 4; }
+.guide-capheight { stroke: var(--guide-capheight); stroke-dasharray: 4 4; }
+.guide-xheight { stroke: var(--guide-xheight); stroke-dasharray: 4 4; }
+.guide-baseline { stroke: var(--guide-baseline); }
+.guide-descender { stroke: var(--guide-descender); stroke-dasharray: 4 4; }
+.guide-lsb { stroke: rgba(255,255,255,0.1); }
+.guide-label { fill: var(--text3); font-size: 10px; font-family: monospace; }
+
+/* Status bar */
+#status-bar {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg2); border-top: 1px solid var(--border);
+  padding: 0 10px; height: 30px; flex-shrink: 0; font-size: 11px; color: var(--text2);
+}
+.status-item { display: flex; align-items: center; gap: 4px; }
+.status-input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  padding: 1px 5px; border-radius: 3px; width: 70px; font-size: 11px;
+  font-family: monospace;
+}
+.status-input:focus { outline: none; border-color: var(--accent); }
+.status-flex { flex: 1; }
+
+/* Upload hint */
+#upload-hint {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none;
+  opacity: 0.4;
+}
+#upload-hint.hidden { display: none; }
+#upload-hint .hint-icon { font-size: 48px; margin-bottom: 8px; }
+#upload-hint .hint-text { font-size: 13px; color: var(--text2); text-align: center; }
+
+/* ─── Right Panel ────────────────────────────────────────────────────────── */
+#right-panel {
+  width: 240px; flex-shrink: 0;
+  background: var(--bg2); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.rtab-bar {
+  display: flex; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); background: var(--bg2);
+}
+.rtab-btn {
+  flex: 1; background: transparent; color: var(--text3); border: none;
+  border-bottom: 2px solid transparent; padding: 7px 4px;
+  cursor: pointer; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; transition: all 0.12s; white-space: nowrap;
+}
+.rtab-btn:hover { color: var(--text); }
+.rtab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.rtab-content { display: none; flex: 1; overflow-y: auto; padding: 10px; }
+.rtab-content.active { display: block; }
+
+/* Section headers in right panel */
+.section-hdr {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text3); margin: 10px 0 5px; padding-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+.section-hdr:first-child { margin-top: 0; }
+
+/* Input rows */
+.input-row { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
+.input-row label { width: 18px; font-size: 11px; color: var(--text2); flex-shrink: 0; font-family: monospace; font-weight: 700; }
+.num-input {
+  flex: 1; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); padding: 3px 6px; border-radius: 3px;
+  font-size: 12px; font-family: monospace; min-width: 0;
+  transition: border-color 0.12s;
+}
+.num-input:focus { outline: none; border-color: var(--accent); }
+.num-input:hover { border-color: var(--text3); }
+
+/* Buttons in right panel */
+.panel-btn {
+  width: 100%; background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;
+  font-weight: 600; text-align: left; margin-bottom: 3px; transition: all 0.12s;
+  display: flex; align-items: center; gap: 5px;
+}
+.panel-btn:hover { background: var(--bg4); border-color: var(--accent2); }
+.panel-btn.danger:hover { border-color: var(--accent); }
+.btn-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.btn-row .panel-btn { flex: 1; justify-content: center; text-align: center; }
+.lock-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px; color: var(--text2); }
+.lock-row input[type=checkbox] { accent-color: var(--accent); }
+
+/* Slider rows */
+.slider-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.slider-row label { font-size: 10px; color: var(--text2); flex-shrink: 0; min-width: 60px; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--accent); height: 3px; }
+.slider-val { font-size: 11px; color: var(--accent); font-family: monospace; min-width: 22px; text-align: right; }
+
+/* Node editor */
+#node-info-empty { color: var(--text3); font-size: 11px; padding: 8px 0; }
+#node-editor { display: none; }
+#handle-section { display: none; }
+
+/* Reference/view options */
+.toggle-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 11px; color: var(--text2); }
+.toggle-row input[type=checkbox] { accent-color: var(--accent); }
+.select-input {
+  flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  padding: 3px 6px; border-radius: 3px; font-size: 11px; cursor: pointer;
+}
+.select-input:focus { outline: none; border-color: var(--accent); }
+
+/* ─── Preview View ──────────────────────────────────────────────────────── */
+#preview-view { padding: 20px; gap: 16px; overflow-y: auto; }
+.preview-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+.preview-field { display: flex; flex-direction: column; gap: 4px; }
+.preview-field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
+.preview-field input[type=text], .preview-field textarea {
+  background: var(--bg2); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 10px; border-radius: 4px; font-size: 14px; min-width: 200px;
+}
+.preview-field input[type=text]:focus, .preview-field textarea:focus { outline: none; border-color: var(--accent); }
+.preview-field textarea { resize: vertical; min-height: 60px; width: 400px; }
+.preview-field input[type=range] { width: 160px; accent-color: var(--accent); }
+.preview-field select { background: var(--bg2); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 4px; }
+#preview-display {
+  min-height: 120px; padding: 20px; border-radius: 6px;
+  border: 1px solid var(--border); background: #fff; color: #000;
+  overflow-x: auto; transition: background 0.2s;
+}
+.preview-hint { color: var(--text3); font-size: 13px; font-style: italic; padding: 20px 0; text-align: center; }
+
+/* ─── Settings Panel (slide-in) ─────────────────────────────────────────── */
+#settings-panel {
+  position: fixed; right: -320px; top: 0; bottom: 0; width: 310px; z-index: 200;
+  background: var(--bg2); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: right 0.25s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: var(--shadow);
+}
+#settings-panel.open { right: 0; }
+#settings-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text);
+}
+#settings-panel-body { flex: 1; overflow-y: auto; padding: 14px; }
+#settings-panel .section-hdr { margin-top: 14px; }
+.settings-field { margin-bottom: 10px; }
+.settings-field label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 4px; }
+.settings-field input[type=text], .settings-field input[type=number] {
+  width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  padding: 6px 8px; border-radius: 4px; font-size: 13px;
+}
+.settings-field input:focus { outline: none; border-color: var(--accent); }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.settings-grid .settings-field { margin-bottom: 0; }
+.settings-submit {
+  width: 100%; padding: 8px; background: var(--accent); color: #fff;
+  border: none; border-radius: 4px; cursor: pointer; font-weight: 700;
+  font-size: 13px; margin-top: 14px; transition: filter 0.12s;
+}
+.settings-submit:hover { filter: brightness(1.15); }
+.close-btn {
+  background: none; border: none; color: var(--text2); cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 2px; transition: color 0.12s;
+}
+.close-btn:hover { color: var(--text); }
+
+/* ─── Notifications ─────────────────────────────────────────────────────── */
+.notification {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  color: #fff; box-shadow: var(--shadow); max-width: 320px;
+  animation: notif-in 0.25s ease; pointer-events: none;
+}
+.notification.info { background: var(--accent2); }
+.notification.error { background: #c62828; }
+@keyframes notif-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ─── File inputs hidden ────────────────────────────────────────────────── */
+input[type=file].hidden-input { display: none; }
+
+/* ─── Responsive adjustments ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  #left-panel { width: 150px; }
+  #right-panel { width: 200px; }
+  .glyph-cell { width: 28px; height: 28px; }
+  .glyph-char { font-size: 14px; }
+}
+
+  </style>
+</head>
+
+<div id="app">
+
+  <!-- ─── Header ───────────────────────────────────────────────────────── -->
+  <header id="header">
+    <div class="logo">FontEditor</div>
+    <div class="sep"></div>
+    <span id="font-name-display">MyFont</span>
+    <div class="sep"></div>
+
+    <!-- Upload current glyph -->
+    <button class="header-btn" id="upload-svg-btn" title="現在の文字にSVGをインポート">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      SVG取込
+    </button>
+    <button class="header-btn" id="batch-upload-btn" title="ファイル名からUnicode判定して一括インポート">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      一括取込
+    </button>
+    <button class="header-btn" id="delete-glyph-btn" title="現在のグリフを削除">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+      削除
+    </button>
+
+    <div class="sep"></div>
+    <button class="header-btn" id="save-project" title="プロジェクトをJSONで保存">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      保存
+    </button>
+    <button class="header-btn" id="load-project" title="プロジェクトを読み込む">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      開く
+    </button>
+
+    <div class="sep"></div>
+    <button class="header-btn accent" id="export-ttf" title="TTFフォントをダウンロード">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export TTF
+    </button>
+    <button class="header-btn secondary" id="export-otf" title="OTFフォントをダウンロード">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export OTF
+    </button>
+    <button class="header-btn" id="settings-btn" title="フォント設定">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2"/></svg>
+      設定
+    </button>
+  </header>
+
+  <!-- ─── Hidden file inputs ────────────────────────────────────────────── -->
+  <input type="file" id="svg-file-input" accept=".svg,image/svg+xml" class="hidden-input">
+  <input type="file" id="batch-file-input" accept=".svg,image/svg+xml" multiple class="hidden-input">
+  <input type="file" id="load-file-input" accept=".fontproj,.json" class="hidden-input">
+
+  <!-- ─── Main body ──────────────────────────────────────────────────────── -->
+  <div id="main-body">
+
+    <!-- Left: Glyph Grid -->
+    <aside id="left-panel">
+      <div class="panel-title">グリフ一覧</div>
+      <div id="glyph-grid"></div>
+    </aside>
+
+    <!-- Center: Editor -->
+    <div id="center-panel">
+
+      <!-- Tab row -->
+      <div id="tab-row">
+        <button class="main-tab-btn active" data-tab="editor">エディタ</button>
+        <button class="main-tab-btn" data-tab="preview">プレビュー</button>
+      </div>
+
+      <!-- ── Editor View ── -->
+      <div id="editor-view">
+        <!-- Toolbar -->
+        <div id="toolbar">
+          <!-- Edit mode tools -->
+          <button class="tool-btn active" data-tool="select" title="選択ツール (S)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-7 1-3 7z"/></svg>
+          </button>
+          <button class="tool-btn" data-tool="node" title="ノード編集 (N)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/></svg>
+          </button>
+          <button class="tool-btn" data-tool="move" title="移動ツール (M)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          </button>
+
+          <div class="tb-sep"></div>
+
+          <!-- Zoom -->
+          <div class="zoom-group">
+            <button class="zoom-btn" id="zoom-out" title="ズームアウト (-)">−</button>
+            <input type="range" id="zoom-slider" min="0" max="100" value="50" title="ズーム">
+            <button class="zoom-btn" id="zoom-in" title="ズームイン (+)">+</button>
+            <span id="zoom-label">100%</span>
+          </div>
+
+          <div class="tb-sep"></div>
+          <button class="tool-btn" id="fit-view" title="フィット (F)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          </button>
+
+          <div class="tb-flex"></div>
+
+          <!-- Glyph nav -->
+          <div class="glyph-nav">
+            <button class="nav-btn" id="nav-prev" title="前の文字 (←)">‹</button>
+            <span id="current-char-label" style="font-size:20px;font-weight:bold;min-width:24px;text-align:center">A</span>
+            <button class="nav-btn" id="nav-next" title="次の文字 (→)">›</button>
+          </div>
+          <span id="current-unicode-label" style="font-size:10px;color:var(--text2);font-family:monospace">U+0041</span>
+        </div>
+
+        <!-- SVG Editor Canvas -->
+        <div id="editor-container">
+          <svg id="editor-svg"></svg>
+          <div id="upload-hint">
+            <div class="hint-icon">⬆</div>
+            <div class="hint-text">SVGをここにドロップ<br>または上の「SVG取込」をクリック</div>
+          </div>
+        </div>
+
+        <!-- Status bar -->
+        <div id="status-bar">
+          <div class="status-item">
+            <label style="font-size:10px;color:var(--text2)">進幅:</label>
+            <input type="number" id="advance-width" class="status-input" value="600" min="1" max="4096" title="アドバンスワイド (フォント単位)">
+          </div>
+          <div class="status-flex"></div>
+          <div class="status-item" style="font-size:10px;color:var(--text3)">
+            スクロールでズーム • Altドラッグでパン • ← → でナビ
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Preview View ── -->
+      <div id="preview-view">
+        <div class="preview-controls">
+          <div class="preview-field">
+            <label>プレビューテキスト</label>
+            <textarea id="preview-text" rows="3">The quick brown fox
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+abcdefghijklmnopqrstuvwxyz
+0123456789 !@#$%</textarea>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="preview-field">
+              <label>フォントサイズ <span id="preview-size-label">48px</span></label>
+              <input type="range" id="preview-size" min="12" max="200" value="48">
+            </div>
+            <div class="preview-field">
+              <label>背景色</label>
+              <select id="preview-bg">
+                <option value="white">白</option>
+                <option value="black">黒</option>
+                <option value="gray">グレー</option>
+              </select>
+            </div>
+            <button class="header-btn accent" id="update-preview-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              プレビュー更新
+            </button>
+          </div>
+        </div>
+        <div id="preview-display">
+          <div class="preview-hint">「プレビュー更新」ボタンを押してフォントを生成してください</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Properties Panel -->
+    <aside id="right-panel">
+      <div class="rtab-bar">
+        <button class="rtab-btn active" data-tab="transform">変形</button>
+        <button class="rtab-btn" data-tab="nodes">ノード</button>
+        <button class="rtab-btn" data-tab="pathtools">パスツール</button>
+        <button class="rtab-btn" data-tab="view">表示</button>
+      </div>
+
+      <!-- ── Transform Tab ── -->
+      <div id="rtab-transform" class="rtab-content active">
+        <div class="section-hdr">位置</div>
+        <div class="input-row">
+          <label>X</label>
+          <input type="number" id="tx" class="num-input" value="0" step="1">
+        </div>
+        <div class="input-row">
+          <label>Y</label>
+          <input type="number" id="ty" class="num-input" value="0" step="1">
+        </div>
+
+        <div class="section-hdr">サイズ</div>
+        <div class="input-row">
+          <label>W</label>
+          <input type="number" id="tw" class="num-input" value="0" min="1" step="1">
+        </div>
+        <div class="input-row">
+          <label>H</label>
+          <input type="number" id="th" class="num-input" value="0" min="1" step="1">
+        </div>
+        <div class="lock-row">
+          <input type="checkbox" id="lock-aspect" checked>
+          <label for="lock-aspect">縦横比を固定</label>
+        </div>
+
+        <div class="section-hdr">反転</div>
+        <div class="btn-row">
+          <button class="panel-btn" id="flip-h">↔ 左右</button>
+          <button class="panel-btn" id="flip-v">↕ 上下</button>
+        </div>
+
+        <div class="section-hdr">回転</div>
+        <div class="input-row">
+          <label>°</label>
+          <input type="number" id="rotate-angle" class="num-input" value="0" step="1">
+          <button class="panel-btn" id="rotate-apply" style="flex:none;padding:3px 8px;margin-bottom:0">適用</button>
+        </div>
+      </div>
+
+      <!-- ── Nodes Tab ── -->
+      <div id="rtab-nodes" class="rtab-content">
+        <p id="node-info-empty">ノードを選択してください</p>
+        <div id="node-editor">
+          <div class="section-hdr">アンカー</div>
+          <div class="input-row">
+            <label>X</label>
+            <input type="number" id="nx" class="num-input" step="0.5">
+          </div>
+          <div class="input-row">
+            <label>Y</label>
+            <input type="number" id="ny" class="num-input" step="0.5">
+          </div>
+          <div id="handle-section">
+            <div class="section-hdr">ハンドル 1 (cp1)</div>
+            <div class="input-row">
+              <label>X</label>
+              <input type="number" id="h1x" class="num-input" step="0.5">
+            </div>
+            <div class="input-row">
+              <label>Y</label>
+              <input type="number" id="h1y" class="num-input" step="0.5">
+            </div>
+            <div class="section-hdr">ハンドル 2 (cp2)</div>
+            <div class="input-row">
+              <label>X</label>
+              <input type="number" id="h2x" class="num-input" step="0.5">
+            </div>
+            <div class="input-row">
+              <label>Y</label>
+              <input type="number" id="h2y" class="num-input" step="0.5">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Path Tools Tab ── -->
+      <div id="rtab-pathtools" class="rtab-content">
+
+        <div class="section-hdr">クリーンアップ</div>
+        <button class="panel-btn" id="cleanup-btn">重複点を除去</button>
+        <button class="panel-btn" id="cleanup-all-btn">全グリフに適用</button>
+
+        <div class="section-hdr">パスの間引き</div>
+        <div class="slider-row">
+          <label>許容誤差</label>
+          <input type="range" id="simplify-tol" min="0.5" max="20" step="0.5" value="2">
+          <span class="slider-val" id="simplify-tol-val">2</span>
+        </div>
+        <button class="panel-btn" id="simplify-btn">現在のグリフを間引き</button>
+        <button class="panel-btn" id="simplify-all-btn">全グリフを間引き</button>
+
+        <div class="section-hdr">曲線の平滑化</div>
+        <div class="slider-row">
+          <label>回数</label>
+          <input type="range" id="smooth-steps" min="1" max="10" step="1" value="3">
+          <span class="slider-val" id="smooth-steps-val">3</span>
+        </div>
+        <button class="panel-btn" id="smooth-btn">現在のグリフを平滑化</button>
+        <button class="panel-btn" id="smooth-all-btn">全グリフを平滑化</button>
+
+        <div class="section-hdr">スムーズベジェ変換</div>
+        <button class="panel-btn" id="fitbezier-btn">Catmull-Romフィット</button>
+        <button class="panel-btn" id="fitbezier-all-btn">全グリフに適用</button>
+
+        <div class="section-hdr">パス方向</div>
+        <button class="panel-btn" id="reverse-btn">パスを逆方向に</button>
+      </div>
+
+      <!-- ── View Tab ── -->
+      <div id="rtab-view" class="rtab-content">
+        <div class="section-hdr">参照フォント</div>
+        <div class="toggle-row">
+          <input type="checkbox" id="show-reference" checked>
+          <label for="show-reference">お手本を表示</label>
+        </div>
+        <div class="input-row" style="margin-bottom:8px">
+          <label style="width:auto;margin-right:6px;font-size:10px;color:var(--text2)">フォント</label>
+          <select id="ref-font-select" class="select-input">
+            <option value="serif">Serif (明朝系)</option>
+            <option value="sans-serif" selected>Sans-serif (ゴシック系)</option>
+            <option value="monospace">Monospace</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="cursive">Cursive</option>
+          </select>
+        </div>
+
+        <div class="section-hdr">表示オプション</div>
+        <div class="toggle-row">
+          <input type="checkbox" id="show-handles" checked>
+          <label for="show-handles">ハンドルを表示</label>
+        </div>
+      </div>
+    </aside>
+  </div><!-- #main-body -->
+
+  <!-- ─── Settings Panel (slide-in) ────────────────────────────────────── -->
+  <div id="settings-panel">
+    <div id="settings-panel-header">
+      フォント設定
+      <button class="close-btn" id="settings-close">✕</button>
+    </div>
+    <div id="settings-panel-body">
+      <form id="settings-form">
+        <div class="section-hdr">メタデータ</div>
+        <div class="settings-field">
+          <label>フォント名</label>
+          <input type="text" id="s-name" value="MyFont" required>
+        </div>
+        <div class="settings-field">
+          <label>スタイル</label>
+          <input type="text" id="s-style" value="Regular">
+        </div>
+
+        <div class="section-hdr">フォントメトリクス</div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>UPM</label>
+            <input type="number" id="s-upm" value="1000" min="100" max="4096">
+          </div>
+          <div class="settings-field">
+            <label>アセンダ</label>
+            <input type="number" id="s-ascender" value="800">
+          </div>
+          <div class="settings-field">
+            <label>ディセンダ</label>
+            <input type="number" id="s-descender" value="-200">
+          </div>
+          <div class="settings-field">
+            <label>大文字高</label>
+            <input type="number" id="s-capheight" value="700">
+          </div>
+          <div class="settings-field">
+            <label>x字高</label>
+            <input type="number" id="s-xheight" value="500">
+          </div>
+        </div>
+
+        <div class="section-hdr">デフォルト字間</div>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label>左 LSB</label>
+            <input type="number" id="s-lsb" value="50" min="0">
+          </div>
+          <div class="settings-field">
+            <label>右 RSB</label>
+            <input type="number" id="s-rsb" value="50" min="0">
+          </div>
+        </div>
+
+        <button type="submit" class="settings-submit">保存</button>
+      </form>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+
+<!-- ─── Scripts ───────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+<script>
+/**
+ * path-ops.js — SVG path parsing, transformation, cleanup, simplify, smooth
+ * All functions operate on arrays of command objects: {type:'M'|'L'|'C'|'Z', ...}
+ */
+
+// ─── Parser ────────────────────────────────────────────────────────────────
+
+function parseSVGPath(d) {
+  if (!d) return [];
+  const result = [];
+  let cx = 0, cy = 0, sx = 0, sy = 0;
+  let prevCp2x = null, prevCp2y = null, prevQcpx = null, prevQcpy = null;
+
+  const segs = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g) || [];
+  for (const seg of segs) {
+    const cmd = seg[0];
+    const rel = cmd !== cmd.toUpperCase() && cmd.toLowerCase() !== 'z';
+    const C = cmd.toUpperCase();
+    const rawNums = seg.slice(1).trim();
+    const nums = [];
+    const _numRe = /[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+    let _nm;
+    while ((_nm = _numRe.exec(rawNums)) !== null) nums.push(parseFloat(_nm[0]));
+    let j = 0;
+    const rn = (def = 0) => j < nums.length ? nums[j++] : def;
+    const ax = (v) => rel ? cx + v : v;
+    const ay = (v) => rel ? cy + v : v;
+
+    prevCp2x = prevCp2y = prevQcpx = prevQcpy = null;
+
+    switch (C) {
+      case 'M': {
+        let first = true;
+        while (j < nums.length) {
+          const x = ax(rn()), y = ay(rn());
+          cx = x; cy = y;
+          if (first) { result.push({ type: 'M', x, y }); sx = x; sy = y; first = false; }
+          else result.push({ type: 'L', x, y });
+        }
+        break;
+      }
+      case 'L':
+        while (j < nums.length) { cx = ax(rn()); cy = ay(rn()); result.push({ type: 'L', x: cx, y: cy }); }
+        break;
+      case 'H':
+        while (j < nums.length) { cx = ax(rn()); result.push({ type: 'L', x: cx, y: cy }); }
+        break;
+      case 'V':
+        while (j < nums.length) { cy = ay(rn()); result.push({ type: 'L', x: cx, y: cy }); }
+        break;
+      case 'C':
+        while (j + 6 <= nums.length) {
+          const cp1x = ax(rn()), cp1y = ay(rn()), cp2x = ax(rn()), cp2y = ay(rn());
+          const x = ax(rn()), y = ay(rn());
+          prevCp2x = cp2x; prevCp2y = cp2y; cx = x; cy = y;
+          result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x, y });
+        }
+        break;
+      case 'S':
+        while (j + 4 <= nums.length) {
+          const cp1x = prevCp2x != null ? 2 * cx - prevCp2x : cx;
+          const cp1y = prevCp2y != null ? 2 * cy - prevCp2y : cy;
+          const cp2x = ax(rn()), cp2y = ay(rn());
+          const x = ax(rn()), y = ay(rn());
+          prevCp2x = cp2x; prevCp2y = cp2y; cx = x; cy = y;
+          result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x, y });
+        }
+        break;
+      case 'Q':
+        while (j + 4 <= nums.length) {
+          const qx = ax(rn()), qy = ay(rn()), x = ax(rn()), y = ay(rn());
+          const cp1x = cx + (2 / 3) * (qx - cx), cp1y = cy + (2 / 3) * (qy - cy);
+          const cp2x = x + (2 / 3) * (qx - x), cp2y = y + (2 / 3) * (qy - y);
+          prevQcpx = qx; prevQcpy = qy; cx = x; cy = y;
+          result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x, y });
+        }
+        break;
+      case 'T':
+        while (j + 2 <= nums.length) {
+          const qx = prevQcpx != null ? 2 * cx - prevQcpx : cx;
+          const qy = prevQcpy != null ? 2 * cy - prevQcpy : cy;
+          const x = ax(rn()), y = ay(rn());
+          const cp1x = cx + (2 / 3) * (qx - cx), cp1y = cy + (2 / 3) * (qy - cy);
+          const cp2x = x + (2 / 3) * (qx - x), cp2y = y + (2 / 3) * (qy - y);
+          prevQcpx = qx; prevQcpy = qy; cx = x; cy = y;
+          result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x, y });
+        }
+        break;
+      case 'A':
+        while (j + 7 <= nums.length) {
+          const rx = Math.abs(rn()), ry = Math.abs(rn()), xrot = rn();
+          const laf = rn() !== 0, sf = rn() !== 0;
+          const x = ax(rn()), y = ay(rn());
+          const arcs = arcToCubics(cx, cy, rx, ry, xrot, laf, sf, x, y);
+          arcs.forEach(a => result.push(a));
+          cx = x; cy = y;
+        }
+        break;
+      case 'Z':
+        result.push({ type: 'Z' });
+        cx = sx; cy = sy;
+        break;
+    }
+  }
+  return result;
+}
+
+function arcToCubics(x1, y1, rx, ry, phi, fa, fs, x2, y2) {
+  const PI = Math.PI, cos = Math.cos, sin = Math.sin, sqrt = Math.sqrt, abs = Math.abs;
+  if (rx === 0 || ry === 0) return [{ type: 'L', x: x2, y: y2 }];
+  if (x1 === x2 && y1 === y2) return [];
+  const phiR = (phi % 360) * PI / 180;
+  const cp = cos(phiR), sp = sin(phiR);
+  const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2;
+  const x1p = cp * dx + sp * dy, y1p = -sp * dx + cp * dy;
+  const x1p2 = x1p * x1p, y1p2 = y1p * y1p;
+  let rx2 = rx * rx, ry2 = ry * ry;
+  const lambda = x1p2 / rx2 + y1p2 / ry2;
+  if (lambda > 1) { const sq = sqrt(lambda); rx *= sq; ry *= sq; rx2 = rx * rx; ry2 = ry * ry; }
+  const num = rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2;
+  const den = rx2 * y1p2 + ry2 * x1p2;
+  const sq = den === 0 ? 0 : sqrt(abs(num / den));
+  const sign = fa === fs ? -1 : 1;
+  const cxp = sign * sq * (rx * y1p / ry);
+  const cyp = sign * sq * -(ry * x1p / rx);
+  const ccx = cp * cxp - sp * cyp + (x1 + x2) / 2;
+  const ccy = sp * cxp + cp * cyp + (y1 + y2) / 2;
+  const va = { x: (x1p - cxp) / rx, y: (y1p - cyp) / ry };
+  const vb = { x: (-x1p - cxp) / rx, y: (-y1p - cyp) / ry };
+  const angleStart = vectorAngle(1, 0, va.x, va.y);
+  let dAngle = vectorAngle(va.x, va.y, vb.x, vb.y);
+  if (!fs && dAngle > 0) dAngle -= 2 * PI;
+  else if (fs && dAngle < 0) dAngle += 2 * PI;
+  const n = Math.ceil(abs(dAngle) / (PI / 2));
+  const da = dAngle / n;
+  const alpha = n > 0 ? sin(da) * (sqrt(4 + 3 * Math.pow(Math.tan(da / 4), 2)) - 1) / 3 : 0;
+  const curves = [];
+  let angle = angleStart, px = x1, py = y1;
+  for (let i = 0; i < n; i++) {
+    const ang2 = angle + da;
+    const dxs = -cp * rx * sin(angle) - sp * ry * cos(angle);
+    const dys = -sp * rx * sin(angle) + cp * ry * cos(angle);
+    const ex = cp * rx * cos(ang2) - sp * ry * sin(ang2) + ccx;
+    const ey = sp * rx * cos(ang2) + cp * ry * sin(ang2) + ccy;
+    const dxe = -cp * rx * sin(ang2) - sp * ry * cos(ang2);
+    const dye = -sp * rx * sin(ang2) + cp * ry * cos(ang2);
+    curves.push({ type: 'C', cp1x: px + alpha * dxs, cp1y: py + alpha * dys, cp2x: ex - alpha * dxe, cp2y: ey - alpha * dye, x: ex, y: ey });
+    px = ex; py = ey; angle = ang2;
+  }
+  return curves;
+}
+
+function vectorAngle(ux, uy, vx, vy) {
+  const d = Math.sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
+  if (d === 0) return 0;
+  const c = Math.max(-1, Math.min(1, (ux * vx + uy * vy) / d));
+  return (ux * vy - uy * vx < 0 ? -1 : 1) * Math.acos(c);
+}
+
+// ─── Serialization ──────────────────────────────────────────────────────────
+
+function cmdsToDString(cmds) {
+  return cmds.map(c => {
+    const r = v => Math.round(v * 100) / 100;
+    switch (c.type) {
+      case 'M': return `M ${r(c.x)} ${r(c.y)}`;
+      case 'L': return `L ${r(c.x)} ${r(c.y)}`;
+      case 'C': return `C ${r(c.cp1x)} ${r(c.cp1y)} ${r(c.cp2x)} ${r(c.cp2y)} ${r(c.x)} ${r(c.y)}`;
+      case 'Z': return 'Z';
+      default: return '';
+    }
+  }).join(' ');
+}
+
+// ─── Bounds ──────────────────────────────────────────────────────────────────
+
+function getCmdsBounds(cmds) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const add = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); };
+  for (const c of cmds) {
+    if (c.type === 'M' || c.type === 'L') add(c.x, c.y);
+    else if (c.type === 'C') {
+      add(c.cp1x, c.cp1y); add(c.cp2x, c.cp2y); add(c.x, c.y);
+    }
+  }
+  if (!isFinite(minX)) return { x: 0, y: 0, w: 0, h: 0 };
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+// ─── Transform ───────────────────────────────────────────────────────────────
+
+function transformCmds(cmds, tx, ty, sx, sy) {
+  if (sy === undefined) sy = sx;
+  return cmds.map(c => {
+    if (c.type === 'M' || c.type === 'L') return { ...c, x: c.x * sx + tx, y: c.y * sy + ty };
+    if (c.type === 'C') return { ...c, cp1x: c.cp1x * sx + tx, cp1y: c.cp1y * sy + ty, cp2x: c.cp2x * sx + tx, cp2y: c.cp2y * sy + ty, x: c.x * sx + tx, y: c.y * sy + ty };
+    return { ...c };
+  });
+}
+
+function flipCmds(cmds, axis, pivot) {
+  return cmds.map(c => {
+    if (axis === 'h') {
+      if (c.type === 'M' || c.type === 'L') return { ...c, x: 2 * pivot - c.x };
+      if (c.type === 'C') return { ...c, cp1x: 2 * pivot - c.cp1x, cp2x: 2 * pivot - c.cp2x, x: 2 * pivot - c.x };
+    } else {
+      if (c.type === 'M' || c.type === 'L') return { ...c, y: 2 * pivot - c.y };
+      if (c.type === 'C') return { ...c, cp1y: 2 * pivot - c.cp1y, cp2y: 2 * pivot - c.cp2y, y: 2 * pivot - c.y };
+    }
+    return { ...c };
+  });
+}
+
+function rotateCmds(cmds, angleDeg, cx, cy) {
+  const rad = angleDeg * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const rot = (x, y) => ({ x: cos * (x - cx) - sin * (y - cy) + cx, y: sin * (x - cx) + cos * (y - cy) + cy });
+  return cmds.map(c => {
+    if (c.type === 'M' || c.type === 'L') { const p = rot(c.x, c.y); return { ...c, ...p }; }
+    if (c.type === 'C') {
+      const p1 = rot(c.cp1x, c.cp1y), p2 = rot(c.cp2x, c.cp2y), p = rot(c.x, c.y);
+      return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y };
+    }
+    return { ...c };
+  });
+}
+
+// ─── Cleanup ─────────────────────────────────────────────────────────────────
+
+function cleanupCmds(cmds, tol = 0.5) {
+  const result = [];
+  let lx = null, ly = null;
+  for (const c of cmds) {
+    if (c.type === 'Z') { result.push(c); lx = null; ly = null; continue; }
+    if (c.type === 'M' || c.type === 'L') {
+      if (lx !== null && Math.abs(c.x - lx) < tol && Math.abs(c.y - ly) < tol) continue;
+      lx = c.x; ly = c.y;
+    } else if (c.type === 'C') {
+      if (lx !== null && Math.abs(c.x - lx) < tol && Math.abs(c.y - ly) < tol) continue;
+      lx = c.x; ly = c.y;
+    }
+    result.push(c);
+  }
+  return result;
+}
+
+// ─── Sub-path Utilities ───────────────────────────────────────────────────────
+
+function splitSubpaths(cmds) {
+  const subs = [];
+  let cur = [], closed = false;
+  for (const c of cmds) {
+    if (c.type === 'M') {
+      if (cur.length) subs.push({ cmds: cur, closed });
+      cur = [c]; closed = false;
+    } else if (c.type === 'Z') {
+      cur.push(c); subs.push({ cmds: cur, closed: true }); cur = []; closed = false;
+    } else cur.push(c);
+  }
+  if (cur.length) subs.push({ cmds: cur, closed });
+  return subs;
+}
+
+function extractPoints(cmds) {
+  const pts = [];
+  for (const c of cmds) {
+    if (c.type === 'M' || c.type === 'L') pts.push({ x: c.x, y: c.y });
+    else if (c.type === 'C') pts.push({ x: c.x, y: c.y });
+  }
+  return pts;
+}
+
+// ─── Simplify (Ramer-Douglas-Peucker) ────────────────────────────────────────
+
+function simplifyCmds(cmds, tolerance = 2) {
+  const result = [];
+  for (const sub of splitSubpaths(cmds)) {
+    let pts = [];
+    let px = 0, py = 0;
+    for (const c of sub.cmds) {
+      if (c.type === 'M') { pts.push({ x: c.x, y: c.y }); px = c.x; py = c.y; }
+      else if (c.type === 'L') { pts.push({ x: c.x, y: c.y }); px = c.x; py = c.y; }
+      else if (c.type === 'C') {
+        for (let t = 0.25; t <= 1; t += 0.25) pts.push(cubicAt(px, py, c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y, t));
+        px = c.x; py = c.y;
+      }
+    }
+    const simp = rdp(pts, tolerance);
+    if (!simp.length) continue;
+    result.push({ type: 'M', x: simp[0].x, y: simp[0].y });
+    for (let i = 1; i < simp.length; i++) result.push({ type: 'L', x: simp[i].x, y: simp[i].y });
+    if (sub.closed) result.push({ type: 'Z' });
+  }
+  return result;
+}
+
+function cubicAt(x0, y0, x1, y1, x2, y2, x3, y3, t) {
+  const mt = 1 - t;
+  return { x: mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3, y: mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3 };
+}
+
+function pointLineDist(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  if (dx === 0 && dy === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy);
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function rdp(pts, eps) {
+  if (pts.length < 3) return pts;
+  let maxD = 0, idx = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const d = pointLineDist(pts[i], pts[0], pts[pts.length - 1]);
+    if (d > maxD) { maxD = d; idx = i; }
+  }
+  if (maxD > eps) {
+    const L = rdp(pts.slice(0, idx + 1), eps);
+    const R = rdp(pts.slice(idx), eps);
+    return [...L.slice(0, -1), ...R];
+  }
+  return [pts[0], pts[pts.length - 1]];
+}
+
+// ─── Smooth (Chaikin corner cutting) ─────────────────────────────────────────
+
+function smoothCmds(cmds, steps = 3) {
+  const result = [];
+  for (const sub of splitSubpaths(cmds)) {
+    let pts = extractPoints(sub.cmds);
+    if (pts.length < 2) continue;
+    for (let s = 0; s < steps; s++) pts = chaikin(pts, sub.closed);
+    result.push({ type: 'M', x: pts[0].x, y: pts[0].y });
+    for (let i = 1; i < pts.length; i++) result.push({ type: 'L', x: pts[i].x, y: pts[i].y });
+    if (sub.closed) result.push({ type: 'Z' });
+  }
+  return result;
+}
+
+function chaikin(pts, closed) {
+  const n = pts.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[i], p1 = pts[(i + 1) % n];
+    if (!closed && i === n - 1) { out.push(p0); break; }
+    out.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y });
+    out.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y });
+  }
+  return out;
+}
+
+// ─── Fit Smooth Bezier (Catmull-Rom → Cubic) ─────────────────────────────────
+
+function fitSmoothBezier(cmds) {
+  const result = [];
+  for (const sub of splitSubpaths(cmds)) {
+    const pts = extractPoints(sub.cmds);
+    const n = pts.length;
+    if (n < 2) continue;
+    result.push({ type: 'M', x: pts[0].x, y: pts[0].y });
+    if (n === 2) { result.push({ type: 'L', x: pts[1].x, y: pts[1].y }); }
+    else {
+      for (let i = 0; i < (sub.closed ? n : n - 1); i++) {
+        const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+        const cp1x = p1.x + (p2.x - p0.x) / 6, cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6, cp2y = p2.y - (p3.y - p1.y) / 6;
+        result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x: p2.x, y: p2.y });
+      }
+    }
+    if (sub.closed) result.push({ type: 'Z' });
+  }
+  return result;
+}
+
+// ─── Winding ─────────────────────────────────────────────────────────────────
+
+function windingArea(cmds) {
+  let area = 0, x0 = 0, y0 = 0, sx = 0, sy = 0;
+  for (const c of cmds) {
+    if (c.type === 'M') { sx = c.x; sy = c.y; x0 = c.x; y0 = c.y; }
+    else if (c.type === 'L') { area += (x0 + c.x) * (c.y - y0); x0 = c.x; y0 = c.y; }
+    else if (c.type === 'C') { area += (x0 + c.x) * (c.y - y0); x0 = c.x; y0 = c.y; }
+    else if (c.type === 'Z') { area += (x0 + sx) * (sy - y0); }
+  }
+  return area / 2;
+}
+
+function reverseCmds(cmds) {
+  const result = [];
+  for (const sub of splitSubpaths(cmds)) {
+    const segs = [];
+    let px = 0, py = 0;
+    for (const c of sub.cmds) {
+      if (c.type === 'M') { px = c.x; py = c.y; }
+      else if (c.type === 'L') { segs.push({ type: 'L', x: px, y: py }); px = c.x; py = c.y; }
+      else if (c.type === 'C') { segs.push({ type: 'C', cp1x: c.cp2x, cp1y: c.cp2y, cp2x: c.cp1x, cp2y: c.cp1y, x: px, y: py }); px = c.x; py = c.y; }
+    }
+    const pts = extractPoints(sub.cmds);
+    if (!pts.length) continue;
+    const last = pts[pts.length - 1];
+    result.push({ type: 'M', x: last.x, y: last.y });
+    for (let i = segs.length - 1; i >= 0; i--) result.push(segs[i]);
+    if (sub.closed) result.push({ type: 'Z' });
+  }
+  return result;
+}
+
+// ─── SVG Import Helper ───────────────────────────────────────────────────────
+
+function extractPathsFromSVG(svgText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, 'image/svg+xml');
+  const results = [];
+  const processEl = (el, matrix) => {
+    const localMatrix = getElementMatrix(el);
+    const combined = multiplyMatrix(matrix, localMatrix);
+    if (el.tagName === 'path') {
+      const d = el.getAttribute('d');
+      if (d) {
+        let cmds = parseSVGPath(d);
+        if (combined) cmds = applyMatrix(cmds, combined);
+        results.push(cmds);
+      }
+    } else if (el.tagName === 'rect') {
+      const x = parseFloat(el.getAttribute('x') || 0), y = parseFloat(el.getAttribute('y') || 0);
+      const w = parseFloat(el.getAttribute('width') || 0), h = parseFloat(el.getAttribute('height') || 0);
+      const rx = parseFloat(el.getAttribute('rx') || 0), ry = parseFloat(el.getAttribute('ry') || rx);
+      let cmds;
+      if (rx === 0 && ry === 0) {
+        cmds = [{ type: 'M', x, y }, { type: 'L', x: x + w, y }, { type: 'L', x: x + w, y: y + h }, { type: 'L', x, y: y + h }, { type: 'Z' }];
+      } else {
+        const r = Math.min(rx, w / 2, ry, h / 2);
+        cmds = parseSVGPath(`M ${x + r} ${y} H ${x + w - r} A ${r} ${r} 0 0 1 ${x + w} ${y + r} V ${y + h - r} A ${r} ${r} 0 0 1 ${x + w - r} ${y + h} H ${x + r} A ${r} ${r} 0 0 1 ${x} ${y + h - r} V ${y + r} A ${r} ${r} 0 0 1 ${x + r} ${y} Z`);
+      }
+      if (combined) cmds = applyMatrix(cmds, combined);
+      results.push(cmds);
+    } else if (el.tagName === 'circle') {
+      const cx = parseFloat(el.getAttribute('cx') || 0), cy = parseFloat(el.getAttribute('cy') || 0), r = parseFloat(el.getAttribute('r') || 0);
+      let cmds = parseSVGPath(`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy} A ${r} ${r} 0 0 1 ${cx - r} ${cy} Z`);
+      if (combined) cmds = applyMatrix(cmds, combined);
+      results.push(cmds);
+    } else if (el.tagName === 'ellipse') {
+      const cx = parseFloat(el.getAttribute('cx') || 0), cy = parseFloat(el.getAttribute('cy') || 0);
+      const rx = parseFloat(el.getAttribute('rx') || 0), ry = parseFloat(el.getAttribute('ry') || 0);
+      let cmds = parseSVGPath(`M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx - rx} ${cy} Z`);
+      if (combined) cmds = applyMatrix(cmds, combined);
+      results.push(cmds);
+    } else if (el.tagName === 'polygon' || el.tagName === 'polyline') {
+      const pts = (el.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number).filter((_, i, a) => i % 2 === 0 ? true : a[i - 1] !== undefined);
+      if (pts.length >= 4) {
+        let cmds = [{ type: 'M', x: pts[0], y: pts[1] }];
+        for (let i = 2; i < pts.length; i += 2) cmds.push({ type: 'L', x: pts[i], y: pts[i + 1] });
+        if (el.tagName === 'polygon') cmds.push({ type: 'Z' });
+        if (combined) cmds = applyMatrix(cmds, combined);
+        results.push(cmds);
+      }
+    }
+    for (const child of el.children) processEl(child, combined);
+  };
+  const root = doc.documentElement;
+  const identity = [1, 0, 0, 1, 0, 0];
+  for (const child of root.children) processEl(child, identity);
+  return results;
+}
+
+function getElementMatrix(el) {
+  const t = el.getAttribute('transform');
+  if (!t) return null;
+  const m = t.match(/matrix\(([^)]+)\)/);
+  if (m) return m[1].split(/[\s,]+/).map(Number);
+  const tr = t.match(/translate\(([^)]+)\)/);
+  if (tr) { const v = tr[1].split(/[\s,]+/).map(Number); return [1, 0, 0, 1, v[0] || 0, v[1] || 0]; }
+  const sc = t.match(/scale\(([^)]+)\)/);
+  if (sc) { const v = sc[1].split(/[\s,]+/).map(Number); const sx = v[0] || 1, sy = v[1] !== undefined ? v[1] : sx; return [sx, 0, 0, sy, 0, 0]; }
+  return null;
+}
+
+function multiplyMatrix(a, b) {
+  if (!b) return a;
+  if (!a) return b;
+  return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+}
+
+function applyMatrix(cmds, m) {
+  const pt = (x, y) => ({ x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] });
+  return cmds.map(c => {
+    if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, ...p }; }
+    if (c.type === 'C') { const p1 = pt(c.cp1x, c.cp1y), p2 = pt(c.cp2x, c.cp2y), p = pt(c.x, c.y); return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y }; }
+    return { ...c };
+  });
+}
+
+
+/**
+ * editor.js — SVG-based glyph editor
+ * Handles zoom/pan, node editing, transform, path display, reference font
+ */
+
+class GlyphEditor {
+  constructor(svgEl, options = {}) {
+    this.svg = svgEl;
+    this.options = Object.assign({
+      upm: 1000,
+      ascender: 800,
+      descender: -200,
+      capHeight: 700,
+      xHeight: 500,
+      onGlyphChange: null,
+      onSelectionChange: null,
+      onBBoxChange: null,
+    }, options);
+
+    this.glyph = null;        // current glyph data
+    this.zoom = 0.5;
+    this.panX = 60;
+    this.panY = 40;
+    this.editMode = 'select'; // 'select' | 'node' | 'move'
+    this.selectedPath = -1;   // index into glyph.pathData
+    this.selectedNode = -1;   // index within subpath
+    this.selectedHandle = null; // {nodeIdx, side: 'cp1'|'cp2'}
+    this.showReference = true;
+    this.referenceFont = 'serif';
+    this.showHandles = true;
+    this.dragState = null;
+
+    this._buildLayers();
+    this._bindEvents();
+  }
+
+  _buildLayers() {
+    this.svg.innerHTML = '';
+    this.svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    // Defs for arrow markers etc.
+    const defs = this._el('defs');
+    this.svg.appendChild(defs);
+
+    // Grid layer (screen space)
+    this.gridLayer = this._el('g', { id: 'grid-layer' });
+    this.svg.appendChild(this.gridLayer);
+
+    // Main editing group — font coordinate transform applied here
+    this.mainGroup = this._el('g', { id: 'main-group' });
+    this.svg.appendChild(this.mainGroup);
+
+    // Reference layer (inside main group = font coords)
+    this.refLayer = this._el('g', { id: 'ref-layer', opacity: '0.13' });
+    this.mainGroup.appendChild(this.refLayer);
+
+    // Glyph paths layer
+    this.pathsLayer = this._el('g', { id: 'paths-layer' });
+    this.mainGroup.appendChild(this.pathsLayer);
+
+    // Advance width line (in main group)
+    this.awLine = this._el('line', { id: 'aw-line', 'stroke': '#e94560', 'stroke-width': '1', 'stroke-dasharray': '4,4', opacity: '0.5' });
+    this.mainGroup.appendChild(this.awLine);
+
+    // Nodes layer (inside main group, compensated sizes)
+    this.nodesLayer = this._el('g', { id: 'nodes-layer' });
+    this.mainGroup.appendChild(this.nodesLayer);
+
+    // Overlay (screen space — for grid guide labels)
+    this.overlayLayer = this._el('g', { id: 'overlay-layer' });
+    this.svg.appendChild(this.overlayLayer);
+  }
+
+  _el(tag, attrs = {}) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  }
+
+  // ─── Coordinate conversion ─────────────────────────────────────────────────
+
+  screenToFont(sx, sy) {
+    const { ascender } = this.options;
+    return { x: (sx - this.panX) / this.zoom, y: ascender - (sy - this.panY) / this.zoom };
+  }
+
+  fontToScreen(fx, fy) {
+    const { ascender } = this.options;
+    return { x: fx * this.zoom + this.panX, y: (ascender - fy) * this.zoom + this.panY };
+  }
+
+  _updateTransform() {
+    const { ascender } = this.options;
+    // translate(panX, panY + ascender*zoom) scale(zoom, -zoom)
+    this.mainGroup.setAttribute('transform', `translate(${this.panX}, ${this.panY + ascender * this.zoom}) scale(${this.zoom}, ${-this.zoom})`);
+  }
+
+  // ─── Load / Get ────────────────────────────────────────────────────────────
+
+  loadGlyph(glyph) {
+    this.glyph = JSON.parse(JSON.stringify(glyph)); // deep clone
+    this.selectedPath = -1;
+    this.selectedNode = -1;
+    this.selectedHandle = null;
+    this.fitToView();
+    this.render();
+    this._notifyBBox();
+  }
+
+  getGlyph() {
+    return JSON.parse(JSON.stringify(this.glyph));
+  }
+
+  updatePathData(pathData) {
+    if (!this.glyph) return;
+    this.glyph.pathData = pathData;
+    this.render();
+    this._notifyBBox();
+    this._notifyChange();
+  }
+
+  // ─── View ──────────────────────────────────────────────────────────────────
+
+  fitToView() {
+    const rect = this.svg.getBoundingClientRect();
+    if (!rect.width) return;
+    const { ascender, descender } = this.options;
+    const fontH = ascender - descender;
+    const margin = 60;
+    this.zoom = (rect.height - margin * 2) / fontH;
+    const aw = this.glyph ? this.glyph.advanceWidth : 600;
+    const totalW = aw * this.zoom;
+    this.panX = (rect.width - totalW) / 2;
+    this.panY = margin;
+    this._updateTransform();
+    this._renderGrid();
+  }
+
+  setZoom(z) {
+    const rect = this.svg.getBoundingClientRect();
+    const cx = rect.width / 2, cy = rect.height / 2;
+    const fpt = this.screenToFont(cx, cy);
+    this.zoom = Math.max(0.05, Math.min(5, z));
+    const newScreen = this.fontToScreen(fpt.x, fpt.y);
+    this.panX += cx - newScreen.x;
+    this.panY += cy - newScreen.y;
+    this._updateTransform();
+    this._renderGrid();
+    this.render();
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  render() {
+    if (!this.glyph) return;
+    this._updateTransform();
+    this._renderGrid();
+    this._renderReference();
+    this._renderPaths();
+    this._renderNodes();
+    this._renderAdvanceWidth();
+  }
+
+  _renderGrid() {
+    this.gridLayer.innerHTML = '';
+    const rect = this.svg.getBoundingClientRect();
+    const W = rect.width || 800, H = rect.height || 600;
+    const { ascender, descender, capHeight, xHeight } = this.options;
+    const aw = this.glyph ? this.glyph.advanceWidth : 600;
+
+    const makeH = (fontY, cls) => {
+      const sy = this.fontToScreen(0, fontY).y;
+      const line = this._el('line', { x1: 0, y1: sy, x2: W, y2: sy, class: cls });
+      this.gridLayer.appendChild(line);
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', 4);
+      label.setAttribute('y', sy - 3);
+      label.setAttribute('class', 'guide-label');
+      label.textContent = fontY;
+      this.gridLayer.appendChild(label);
+    };
+
+    // Major grid lines at font metric positions
+    makeH(ascender, 'guide-line guide-ascender');
+    makeH(capHeight, 'guide-line guide-capheight');
+    makeH(xHeight, 'guide-line guide-xheight');
+    makeH(0, 'guide-line guide-baseline');
+    makeH(descender, 'guide-line guide-descender');
+
+    // Left side bearing line (x=0)
+    const sx0 = this.fontToScreen(0, 0).x;
+    const lsb = this._el('line', { x1: sx0, y1: 0, x2: sx0, y2: H, class: 'guide-line guide-lsb' });
+    this.gridLayer.appendChild(lsb);
+  }
+
+  _renderReference() {
+    this.refLayer.innerHTML = '';
+    if (!this.showReference || !this.glyph || !this.glyph.char) return;
+    const { ascender, descender } = this.options;
+    const fontH = ascender - descender;
+    // Draw reference character as text element (will be flipped with group)
+    // We need to flip text back since the group already flips Y
+    const g = this._el('g', { transform: `translate(0, ${ascender}) scale(1,-1)` });
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    const aw = this.glyph.advanceWidth || 600;
+    text.setAttribute('x', aw / 2);
+    text.setAttribute('y', 0);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'auto');
+    text.setAttribute('font-size', fontH);
+    text.setAttribute('font-family', this.referenceFont);
+    text.setAttribute('fill', '#8888cc');
+    text.textContent = this.glyph.char;
+    g.appendChild(text);
+    this.refLayer.appendChild(g);
+  }
+
+  _renderPaths() {
+    this.pathsLayer.innerHTML = '';
+    if (!this.glyph || !this.glyph.pathData) return;
+    const pathData = this.glyph.pathData;
+    if (!pathData.length) return;
+
+    // Combine all subpaths into one d string for display
+    const d = cmdsToDString(pathData);
+    const pathEl = this._el('path', {
+      d,
+      fill: '#ddeeff',
+      'fill-rule': 'evenodd',
+      stroke: '#4fc3f7',
+      'stroke-width': String(1 / this.zoom),
+      opacity: '0.85',
+      class: 'glyph-path',
+    });
+    this.pathsLayer.appendChild(pathEl);
+  }
+
+  _renderNodes() {
+    this.nodesLayer.innerHTML = '';
+    if (this.editMode === 'move' || !this.glyph || !this.glyph.pathData) return;
+    const cmds = this.glyph.pathData;
+    const nR = 5 / this.zoom;    // node radius in font units
+    const hR = 3.5 / this.zoom;  // handle radius
+    const sw = 1 / this.zoom;    // stroke width
+
+    let mx = 0, my = 0;
+    let nodeIdx = 0;
+    // Build list of on-curve points and handles per segment
+    const subpaths = splitSubpaths(cmds);
+    for (const sub of subpaths) {
+      let px = 0, py = 0;
+      const pts = [];
+      for (const c of sub.cmds) {
+        if (c.type === 'M') { px = c.x; py = c.y; pts.push({ type: 'anchor', x: c.x, y: c.y, cmdIdx: nodeIdx }); }
+        else if (c.type === 'L') { pts.push({ type: 'anchor', x: c.x, y: c.y, cmdIdx: nodeIdx }); px = c.x; py = c.y; }
+        else if (c.type === 'C') {
+          pts.push({ type: 'handle', hx: c.cp1x, hy: c.cp1y, ax: px, ay: py, cmdIdx: nodeIdx, side: 'cp1' });
+          pts.push({ type: 'handle', hx: c.cp2x, hy: c.cp2y, ax: c.x, ay: c.y, cmdIdx: nodeIdx, side: 'cp2' });
+          pts.push({ type: 'anchor', x: c.x, y: c.y, cmdIdx: nodeIdx });
+          px = c.x; py = c.y;
+        }
+        nodeIdx++;
+      }
+
+      // Draw handle lines first
+      if (this.showHandles) {
+        for (const p of pts) {
+          if (p.type === 'handle') {
+            const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#81d4fa', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
+            this.nodesLayer.appendChild(line);
+          }
+        }
+        // Draw handle circles
+        for (const p of pts) {
+          if (p.type === 'handle') {
+            const isSel = this.selectedHandle && this.selectedHandle.cmdIdx === p.cmdIdx && this.selectedHandle.side === p.side;
+            const circle = this._el('circle', { cx: p.hx, cy: p.hy, r: hR, fill: 'none', stroke: isSel ? '#ffcc02' : '#81d4fa', 'stroke-width': sw, cursor: 'move', 'data-cmd': p.cmdIdx, 'data-side': p.side });
+            circle.addEventListener('mousedown', e => this._handleHandleMousedown(e, p.cmdIdx, p.side));
+            this.nodesLayer.appendChild(circle);
+          }
+        }
+      }
+
+      // Draw anchor circles on top
+      for (const p of pts) {
+        if (p.type === 'anchor') {
+          const isSel = this.selectedNode === p.cmdIdx;
+          const circle = this._el('circle', { cx: p.x, cy: p.y, r: nR, fill: isSel ? '#ffcc02' : '#4fc3f7', stroke: '#0a0a1a', 'stroke-width': sw * 1.5, cursor: 'move', 'data-cmd': p.cmdIdx });
+          circle.addEventListener('mousedown', e => this._handleNodeMousedown(e, p.cmdIdx));
+          this.nodesLayer.appendChild(circle);
+        }
+      }
+    }
+  }
+
+  _renderAdvanceWidth() {
+    const aw = this.glyph ? this.glyph.advanceWidth : 600;
+    const { ascender, descender } = this.options;
+    this.awLine.setAttribute('x1', aw);
+    this.awLine.setAttribute('y1', descender - 100);
+    this.awLine.setAttribute('x2', aw);
+    this.awLine.setAttribute('y2', ascender + 100);
+    this.awLine.setAttribute('stroke-width', 1.5 / this.zoom);
+    this.awLine.setAttribute('stroke-dasharray', `${6 / this.zoom},${4 / this.zoom}`);
+  }
+
+  // ─── Mouse events ──────────────────────────────────────────────────────────
+
+  _bindEvents() {
+    this.svg.addEventListener('mousedown', e => this._onMousedown(e));
+    this.svg.addEventListener('mousemove', e => this._onMousemove(e));
+    this.svg.addEventListener('mouseup', e => this._onMouseup(e));
+    this.svg.addEventListener('wheel', e => this._onWheel(e), { passive: false });
+    this.svg.addEventListener('dblclick', e => this._onDblclick(e));
+    this.svg.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  _getEventPos(e) {
+    const rect = this.svg.getBoundingClientRect();
+    return { sx: e.clientX - rect.left, sy: e.clientY - rect.top };
+  }
+
+  _onMousedown(e) {
+    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer')) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
+        this.dragState = { type: 'pan', startSx: sx, startSy: sy, startPanX: this.panX, startPanY: this.panY };
+        e.preventDefault(); return;
+      }
+      if (this.editMode === 'select' || this.editMode === 'node') {
+        this.selectedNode = -1; this.selectedHandle = null;
+        this._renderNodes();
+        if (this.options.onSelectionChange) this.options.onSelectionChange(null, null);
+      }
+      if (this.editMode === 'move' && this.glyph) {
+        this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
+      }
+    }
+  }
+
+  _handleNodeMousedown(e, cmdIdx) {
+    e.stopPropagation();
+    const { sx, sy } = this._getEventPos(e);
+    this.selectedNode = cmdIdx;
+    this.selectedHandle = null;
+    this._renderNodes();
+    this.dragState = { type: 'move-node', cmdIdx, startFx: this.screenToFont(sx, sy).x, startFy: this.screenToFont(sx, sy).y, origCmds: JSON.parse(JSON.stringify(this.glyph.pathData)) };
+    const cmd = this.glyph.pathData[cmdIdx];
+    if (this.options.onSelectionChange) this.options.onSelectionChange(cmd, cmdIdx);
+  }
+
+  _handleHandleMousedown(e, cmdIdx, side) {
+    e.stopPropagation();
+    const { sx, sy } = this._getEventPos(e);
+    this.selectedHandle = { cmdIdx, side };
+    this.selectedNode = -1;
+    this._renderNodes();
+    this.dragState = { type: 'move-handle', cmdIdx, side, startFx: this.screenToFont(sx, sy).x, startFy: this.screenToFont(sx, sy).y, origCmds: JSON.parse(JSON.stringify(this.glyph.pathData)) };
+  }
+
+  _onMousemove(e) {
+    if (!this.dragState) return;
+    const { sx, sy } = this._getEventPos(e);
+    const ds = this.dragState;
+
+    if (ds.type === 'pan') {
+      this.panX = ds.startPanX + (sx - ds.startSx);
+      this.panY = ds.startPanY + (sy - ds.startSy);
+      this._updateTransform(); this._renderGrid(); return;
+    }
+    if (ds.type === 'move-node') {
+      const fp = this.screenToFont(sx, sy);
+      const dx = fp.x - ds.startFx, dy = fp.y - ds.startFy;
+      const cmds = JSON.parse(JSON.stringify(ds.origCmds));
+      const c = cmds[ds.cmdIdx];
+      if (c.type === 'M' || c.type === 'L') { c.x += dx; c.y += dy; }
+      else if (c.type === 'C') { c.x += dx; c.y += dy; c.cp2x += dx; c.cp2y += dy; }
+      this.glyph.pathData = cmds;
+      this._renderPaths(); this._renderNodes(); this._notifyBBox(); this._notifyChange();
+      return;
+    }
+    if (ds.type === 'move-handle') {
+      const fp = this.screenToFont(sx, sy);
+      const dx = fp.x - ds.startFx, dy = fp.y - ds.startFy;
+      const cmds = JSON.parse(JSON.stringify(ds.origCmds));
+      const c = cmds[ds.cmdIdx];
+      if (c.type === 'C') {
+        if (ds.side === 'cp1') { c.cp1x += dx; c.cp1y += dy; }
+        else { c.cp2x += dx; c.cp2y += dy; }
+      }
+      this.glyph.pathData = cmds;
+      this._renderPaths(); this._renderNodes(); this._notifyChange();
+      return;
+    }
+    if (ds.type === 'move-glyph') {
+      const fp = this.screenToFont(sx, sy);
+      const fp0 = this.screenToFont(ds.startSx, ds.startSy);
+      const dx = fp.x - fp0.x, dy = fp.y - fp0.y;
+      this.glyph.pathData = transformCmds(JSON.parse(JSON.stringify(ds.origData)), dx, dy, 1, 1);
+      this._renderPaths(); this._renderNodes(); this._notifyBBox(); this._notifyChange();
+    }
+  }
+
+  _onMouseup(e) {
+    this.dragState = null;
+  }
+
+  _onWheel(e) {
+    e.preventDefault();
+    const { sx, sy } = this._getEventPos(e);
+    const fpt = this.screenToFont(sx, sy);
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    this.zoom = Math.max(0.05, Math.min(5, this.zoom * factor));
+    const ns = this.fontToScreen(fpt.x, fpt.y);
+    this.panX += sx - ns.x;
+    this.panY += sy - ns.y;
+    this._updateTransform(); this._renderGrid(); this.render();
+    if (this.options.onZoomChange) this.options.onZoomChange(this.zoom);
+  }
+
+  _onDblclick(e) {
+    // Future: add node on double-click on path
+  }
+
+  // ─── Transform operations ─────────────────────────────────────────────────
+
+  translateBy(dx, dy) {
+    if (!this.glyph) return;
+    this.glyph.pathData = transformCmds(this.glyph.pathData, dx, dy, 1, 1);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  scaleToSize(newW, newH, lockAspect) {
+    if (!this.glyph) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    if (b.w === 0 || b.h === 0) return;
+    let sx = newW / b.w, sy = newH / b.h;
+    if (lockAspect) { const s = Math.min(sx, sy); sx = s; sy = s; }
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    let cmds = transformCmds(this.glyph.pathData, -cx, -cy, sx, sy);
+    cmds = transformCmds(cmds, cx, cy, 1, 1);
+    this.glyph.pathData = cmds;
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  flipH() {
+    if (!this.glyph) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    const cx = b.x + b.w / 2;
+    this.glyph.pathData = flipCmds(this.glyph.pathData, 'h', cx);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  flipV() {
+    if (!this.glyph) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    const cy = b.y + b.h / 2;
+    this.glyph.pathData = flipCmds(this.glyph.pathData, 'v', cy);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  rotate(angle) {
+    if (!this.glyph) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    this.glyph.pathData = rotateCmds(this.glyph.pathData, angle, cx, cy);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  setPosition(x, y) {
+    if (!this.glyph) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    this.translateBy(x - b.x, y - b.y);
+  }
+
+  getBBox() {
+    if (!this.glyph || !this.glyph.pathData.length) return null;
+    return getCmdsBounds(this.glyph.pathData);
+  }
+
+  // ─── Node editing ─────────────────────────────────────────────────────────
+
+  getSelectedNodeData() {
+    if (!this.glyph || this.selectedNode < 0) return null;
+    return this.glyph.pathData[this.selectedNode];
+  }
+
+  updateSelectedNode(x, y) {
+    if (!this.glyph || this.selectedNode < 0) return;
+    const c = this.glyph.pathData[this.selectedNode];
+    if (!c) return;
+    const dx = x - c.x, dy = y - c.y;
+    c.x = x; c.y = y;
+    if (c.type === 'C') { c.cp2x += dx; c.cp2y += dy; }
+    // Move cp1 of NEXT segment if it exists
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  updateSelectedHandle(side, x, y) {
+    if (!this.glyph || !this.selectedHandle) return;
+    const c = this.glyph.pathData[this.selectedHandle.cmdIdx];
+    if (!c || c.type !== 'C') return;
+    if (side === 'cp1') { c.cp1x = x; c.cp1y = y; }
+    else { c.cp2x = x; c.cp2y = y; }
+    this.render(); this._notifyChange();
+  }
+
+  deleteSelectedNode() {
+    if (!this.glyph || this.selectedNode < 0) return;
+    this.glyph.pathData.splice(this.selectedNode, 1);
+    this.selectedNode = -1;
+    this.render(); this._notifyChange();
+  }
+
+  // ─── Path tools (delegating to path-ops) ──────────────────────────────────
+
+  applyCleanup(tol = 0.5) {
+    if (!this.glyph) return;
+    this.glyph.pathData = cleanupCmds(this.glyph.pathData, tol);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  applySimplify(tol = 2) {
+    if (!this.glyph) return;
+    this.glyph.pathData = simplifyCmds(this.glyph.pathData, tol);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  applySmooth(steps = 3) {
+    if (!this.glyph) return;
+    this.glyph.pathData = smoothCmds(this.glyph.pathData, steps);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  applyFitBezier() {
+    if (!this.glyph) return;
+    this.glyph.pathData = fitSmoothBezier(this.glyph.pathData);
+    this.render(); this._notifyBBox(); this._notifyChange();
+  }
+
+  applyReverse() {
+    if (!this.glyph) return;
+    this.glyph.pathData = reverseCmds(this.glyph.pathData);
+    this.render(); this._notifyChange();
+  }
+
+  // ─── Settings ─────────────────────────────────────────────────────────────
+
+  setEditMode(mode) {
+    this.editMode = mode;
+    this.svg.style.cursor = mode === 'move' ? 'grab' : 'default';
+    this.render();
+  }
+
+  setShowReference(v) {
+    this.showReference = v;
+    this._renderReference();
+  }
+
+  setReferenceFont(font) {
+    this.referenceFont = font;
+    this._renderReference();
+  }
+
+  setShowHandles(v) {
+    this.showHandles = v;
+    this._renderNodes();
+  }
+
+  setAdvanceWidth(aw) {
+    if (!this.glyph) return;
+    this.glyph.advanceWidth = aw;
+    this._renderAdvanceWidth();
+  }
+
+  // ─── Notifications ────────────────────────────────────────────────────────
+
+  _notifyChange() {
+    if (this.options.onGlyphChange) this.options.onGlyphChange(this.getGlyph());
+  }
+
+  _notifyBBox() {
+    if (this.options.onBBoxChange) {
+      this.options.onBBoxChange(this.getBBox());
+    }
+  }
+}
+
+
+/**
+ * font-gen.js — TTF/OTF font generation using opentype.js
+ * Converts FontProject data into a downloadable font file.
+ */
+
+function generateAndDownloadFont(project, format = 'ttf') {
+  if (typeof opentype === 'undefined') {
+    alert('opentype.js not loaded!');
+    return;
+  }
+
+  const upm = project.upm || 1000;
+  const ascender = project.ascender || 800;
+  const descender = project.descender || -200;
+
+  // .notdef glyph (empty box)
+  const notdefPath = new opentype.Path();
+  notdefPath.moveTo(50, 0);
+  notdefPath.lineTo(50, 700);
+  notdefPath.lineTo(450, 700);
+  notdefPath.lineTo(450, 0);
+  notdefPath.close();
+  notdefPath.moveTo(100, 50);
+  notdefPath.lineTo(400, 50);
+  notdefPath.lineTo(400, 650);
+  notdefPath.lineTo(100, 650);
+  notdefPath.close();
+
+  const notdefGlyph = new opentype.Glyph({
+    name: '.notdef',
+    unicode: 0,
+    advanceWidth: 500,
+    path: notdefPath,
+  });
+
+  const glyphs = [notdefGlyph];
+
+  for (const [unicodeStr, glyph] of Object.entries(project.glyphs)) {
+    const unicode = parseInt(unicodeStr);
+    if (!glyph.pathData || glyph.pathData.length === 0) continue;
+
+    const otPath = new opentype.Path();
+    const cmds = glyph.pathData;
+
+    for (const c of cmds) {
+      switch (c.type) {
+        case 'M': otPath.moveTo(c.x, c.y); break;
+        case 'L': otPath.lineTo(c.x, c.y); break;
+        case 'C': otPath.bezierCurveTo(c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y); break;
+        case 'Z': otPath.close(); break;
+      }
+    }
+
+    const lsb = glyph.lsb != null ? glyph.lsb : (project.defaultLsb || 50);
+    const rsb = glyph.rsb != null ? glyph.rsb : (project.defaultRsb || 50);
+    const bounds = getCmdsBounds(cmds);
+    const glyphWidth = glyph.advanceWidth || (bounds.w > 0 ? bounds.x + bounds.w + rsb : 600);
+
+    const otGlyph = new opentype.Glyph({
+      name: `uni${unicode.toString(16).toUpperCase().padStart(4, '0')}`,
+      unicode,
+      advanceWidth: glyphWidth,
+      path: otPath,
+    });
+    glyphs.push(otGlyph);
+  }
+
+  if (glyphs.length <= 1) {
+    alert('エクスポートするグリフがありません。まず文字をアップロードしてください。');
+    return;
+  }
+
+  const font = new opentype.Font({
+    familyName: project.name || 'MyFont',
+    styleName: project.style || 'Regular',
+    unitsPerEm: upm,
+    ascender,
+    descender,
+    glyphs,
+  });
+
+  font.download(`${project.name || 'MyFont'}.${format}`);
+  return font;
+}
+
+/**
+ * Generate font and return as ArrayBuffer (for preview via FontFace API)
+ */
+function generateFontBuffer(project) {
+  if (typeof opentype === 'undefined') return null;
+
+  const upm = project.upm || 1000;
+  const ascender = project.ascender || 800;
+  const descender = project.descender || -200;
+
+  const notdefPath = new opentype.Path();
+  notdefPath.moveTo(50, 0); notdefPath.lineTo(50, 700);
+  notdefPath.lineTo(450, 700); notdefPath.lineTo(450, 0); notdefPath.close();
+  const notdefGlyph = new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: 500, path: notdefPath });
+
+  const glyphs = [notdefGlyph];
+  for (const [unicodeStr, glyph] of Object.entries(project.glyphs)) {
+    const unicode = parseInt(unicodeStr);
+    if (!glyph.pathData || glyph.pathData.length === 0) continue;
+    const otPath = new opentype.Path();
+    for (const c of glyph.pathData) {
+      if (c.type === 'M') otPath.moveTo(c.x, c.y);
+      else if (c.type === 'L') otPath.lineTo(c.x, c.y);
+      else if (c.type === 'C') otPath.bezierCurveTo(c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y);
+      else if (c.type === 'Z') otPath.close();
+    }
+    const bounds = getCmdsBounds(glyph.pathData);
+    const glyphWidth = glyph.advanceWidth || (bounds.w > 0 ? bounds.x + bounds.w + 50 : 600);
+    glyphs.push(new opentype.Glyph({ name: `uni${unicode.toString(16).toUpperCase().padStart(4, '0')}`, unicode, advanceWidth: glyphWidth, path: otPath }));
+  }
+
+  if (glyphs.length <= 1) return null;
+  const font = new opentype.Font({ familyName: project.name || 'MyFont', styleName: project.style || 'Regular', unitsPerEm: upm, ascender, descender, glyphs });
+  return font.download ? font : null;
+}
+
+
+/**
+ * app.js — Main application logic
+ * Glyphr Studio-like UI with FontForge-like features
+ */
+
+// ─── Default character set ───────────────────────────────────────────────────
+
+const CHAR_GROUPS = [
+  { label: 'UPPERCASE', chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' },
+  { label: 'lowercase', chars: 'abcdefghijklmnopqrstuvwxyz' },
+  { label: '0 – 9', chars: '0123456789' },
+  { label: 'Symbols', chars: '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~' },
+  { label: 'Space', chars: ' ' },
+];
+
+const ALL_CHARS = [];
+for (const g of CHAR_GROUPS) {
+  for (const ch of g.chars) {
+    ALL_CHARS.push({ char: ch, unicode: ch.codePointAt(0) });
+  }
+}
+
+// ─── Application State ───────────────────────────────────────────────────────
+
+const App = {
+  project: {
+    name: 'MyFont',
+    style: 'Regular',
+    upm: 1000,
+    ascender: 800,
+    descender: -200,
+    capHeight: 700,
+    xHeight: 500,
+    defaultLsb: 50,
+    defaultRsb: 50,
+    glyphs: {}, // unicode -> glyph object
+  },
+  editor: null,
+  currentUnicode: null,
+  activeRightTab: 'transform',
+  previewFontFamily: null,
+  previewFontKey: 0,
+  undoStack: [],
+  redoStack: [],
+
+  init() {
+    this.editor = new GlyphEditor(document.getElementById('editor-svg'), {
+      upm: this.project.upm,
+      ascender: this.project.ascender,
+      descender: this.project.descender,
+      capHeight: this.project.capHeight,
+      xHeight: this.project.xHeight,
+      onGlyphChange: (glyph) => this._onGlyphChange(glyph),
+      onBBoxChange: (bbox) => this._onBBoxChange(bbox),
+      onSelectionChange: (cmd, idx) => this._onSelectionChange(cmd, idx),
+      onZoomChange: (z) => this._onZoomChange(z),
+    });
+
+    this._buildGlyphGrid();
+    this._bindUIEvents();
+    this._bindDropZone();
+    this._bindKeyboard();
+    this.selectChar(65); // Start with 'A'
+    this._updateSettingsForm();
+
+    // Bind zoom slider
+    const zSlider = document.getElementById('zoom-slider');
+    if (zSlider) {
+      zSlider.value = 50;
+      zSlider.addEventListener('input', () => {
+        const z = Math.pow(2, (zSlider.value - 50) / 25);
+        this.editor.setZoom(z);
+        document.getElementById('zoom-label').textContent = Math.round(z * 100) + '%';
+      });
+    }
+
+    // Window resize
+    window.addEventListener('resize', () => {
+      if (this.editor && this.currentUnicode != null) this.editor.render();
+    });
+  },
+
+  // ─── Glyph Grid ─────────────────────────────────────────────────────────────
+
+  _buildGlyphGrid() {
+    const container = document.getElementById('glyph-grid');
+    if (!container) return;
+    container.innerHTML = '';
+
+    for (const group of CHAR_GROUPS) {
+      const header = document.createElement('div');
+      header.className = 'glyph-group-header';
+      header.textContent = group.label;
+      container.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'glyph-row';
+
+      for (const ch of group.chars) {
+        const unicode = ch.codePointAt(0);
+        const cell = document.createElement('div');
+        cell.className = 'glyph-cell';
+        cell.id = `gcell-${unicode}`;
+        cell.title = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')} "${ch}"`;
+
+        const label = document.createElement('span');
+        label.className = 'glyph-char';
+        label.textContent = ch === ' ' ? '·' : ch;
+        cell.appendChild(label);
+
+        const badge = document.createElement('span');
+        badge.className = 'glyph-badge';
+        badge.id = `gbadge-${unicode}`;
+        cell.appendChild(badge);
+
+        cell.addEventListener('click', () => this.selectChar(unicode));
+        cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('drag-over'); });
+        cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+        cell.addEventListener('drop', e => {
+          e.preventDefault(); cell.classList.remove('drag-over');
+          const file = e.dataTransfer.files[0];
+          if (file) this._importSVGForChar(unicode, file);
+        });
+        grid.appendChild(cell);
+      }
+      container.appendChild(grid);
+    }
+    this._refreshGlyphGrid();
+  },
+
+  _refreshGlyphGrid() {
+    for (const g of ALL_CHARS) {
+      const cell = document.getElementById(`gcell-${g.unicode}`);
+      if (!cell) continue;
+      const badge = document.getElementById(`gbadge-${g.unicode}`);
+      if (this.project.glyphs[g.unicode]) {
+        cell.classList.add('has-glyph');
+        if (badge) badge.textContent = '●';
+      } else {
+        cell.classList.remove('has-glyph');
+        if (badge) badge.textContent = '';
+      }
+      if (g.unicode === this.currentUnicode) cell.classList.add('active');
+      else cell.classList.remove('active');
+    }
+  },
+
+  // ─── Glyph Selection ─────────────────────────────────────────────────────────
+
+  selectChar(unicode) {
+    this._saveCurrentGlyph();
+    this.currentUnicode = unicode;
+
+    const char = String.fromCodePoint(unicode);
+    document.getElementById('current-char-label').textContent = char === ' ' ? 'Space' : char;
+    document.getElementById('current-unicode-label').textContent = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')}`;
+
+    const glyph = this.project.glyphs[unicode] || {
+      unicode,
+      char,
+      advanceWidth: 600,
+      lsb: this.project.defaultLsb,
+      rsb: this.project.defaultRsb,
+      pathData: [],
+    };
+
+    document.getElementById('advance-width').value = glyph.advanceWidth;
+    this.editor.loadGlyph(glyph);
+    this._refreshGlyphGrid();
+    this._refreshNavButtons();
+  },
+
+  _saveCurrentGlyph() {
+    if (this.currentUnicode == null || !this.editor.glyph) return;
+    this.project.glyphs[this.currentUnicode] = this.editor.getGlyph();
+  },
+
+  _prevNextChar(dir) {
+    const chars = ALL_CHARS;
+    const idx = chars.findIndex(c => c.unicode === this.currentUnicode);
+    const next = chars[idx + dir];
+    if (next) this.selectChar(next.unicode);
+  },
+
+  _refreshNavButtons() {
+    const chars = ALL_CHARS;
+    const idx = chars.findIndex(c => c.unicode === this.currentUnicode);
+    const prevBtn = document.getElementById('nav-prev');
+    const nextBtn = document.getElementById('nav-next');
+    if (prevBtn) prevBtn.disabled = idx <= 0;
+    if (nextBtn) nextBtn.disabled = idx >= chars.length - 1;
+  },
+
+  // ─── SVG Import ──────────────────────────────────────────────────────────────
+
+  _importSVGForChar(unicode, file) {
+    if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
+      this._notify('SVGファイルを選択してください', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const pathsFromSVG = extractPathsFromSVG(e.target.result);
+        if (!pathsFromSVG.length) {
+          this._notify('パスが見つかりませんでした', 'error');
+          return;
+        }
+        // Merge all extracted paths into one command array
+        let allCmds = [];
+        for (const p of pathsFromSVG) allCmds = allCmds.concat(p);
+
+        // Fit to font space
+        const fitted = this._fitToFontSpace(allCmds);
+        const char = String.fromCodePoint(unicode);
+        const aw = fitted.advanceWidth;
+
+        this.project.glyphs[unicode] = {
+          unicode,
+          char,
+          advanceWidth: aw,
+          lsb: this.project.defaultLsb,
+          rsb: this.project.defaultRsb,
+          pathData: fitted.cmds,
+        };
+
+        this._refreshGlyphGrid();
+        if (unicode === this.currentUnicode) {
+          this.editor.loadGlyph(this.project.glyphs[unicode]);
+          document.getElementById('advance-width').value = aw;
+        }
+        this._notify(`"${char}" をインポートしました`);
+      } catch (err) {
+        console.error(err);
+        this._notify('SVGの読み込みに失敗しました: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  _fitToFontSpace(cmds) {
+    const { ascender, descender, defaultLsb, defaultRsb } = this.project;
+    const fontH = ascender - descender;
+    const b = getCmdsBounds(cmds);
+    if (b.w === 0 || b.h === 0) return { cmds, advanceWidth: 600 };
+
+    // Scale to fit height
+    const scale = fontH / b.h;
+    // Translate: move bottom-left of glyph to (lsb, descender), flip Y
+    // SVG Y increases down, font Y increases up:
+    //   fontX = (svgX - b.x) * scale + lsb
+    //   fontY = ascender - (svgY - b.y) * scale   [flip]
+    const lsb = defaultLsb || 50;
+    const tx = -b.x * scale + lsb;
+    const ty_svg = b.y; // top of SVG bbox
+
+    const fitted = cmds.map(c => {
+      const pt = (x, y) => ({ x: x * scale + tx, y: ascender - (y - ty_svg) * scale });
+      if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, ...p }; }
+      if (c.type === 'C') {
+        const p1 = pt(c.cp1x, c.cp1y), p2 = pt(c.cp2x, c.cp2y), p = pt(c.x, c.y);
+        return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y };
+      }
+      return { ...c };
+    });
+
+    const newB = getCmdsBounds(fitted);
+    const advanceWidth = newB.w + lsb + (defaultRsb || 50);
+    return { cmds: fitted, advanceWidth };
+  },
+
+  // ─── Batch import ────────────────────────────────────────────────────────────
+
+  _batchImportSVGs(files) {
+    let count = 0;
+    for (const file of files) {
+      const match = file.name.match(/[Uu]\+?([0-9A-Fa-f]{4,5})|^([A-Za-z0-9])\.svg$/i);
+      if (match) {
+        let unicode;
+        if (match[1]) unicode = parseInt(match[1], 16);
+        else if (match[2]) unicode = match[2].codePointAt(0);
+        if (unicode) { this._importSVGForChar(unicode, file); count++; }
+      }
+    }
+    if (count) this._notify(`${count}個のSVGをインポートしました`);
+    else this._notify('ファイル名からUnicodeを解析できませんでした。ファイル名を "A.svg" や "U+0041.svg" の形式にしてください。', 'error');
+  },
+
+  // ─── Editor callbacks ─────────────────────────────────────────────────────────
+
+  _onGlyphChange(glyph) {
+    this.project.glyphs[glyph.unicode] = glyph;
+    this._refreshGlyphGrid();
+  },
+
+  _onBBoxChange(bbox) {
+    if (!bbox) return;
+    const r = v => Math.round(v);
+    const xI = document.getElementById('tx');
+    const yI = document.getElementById('ty');
+    const wI = document.getElementById('tw');
+    const hI = document.getElementById('th');
+    if (document.activeElement !== xI) { if (xI) xI.value = r(bbox.x); }
+    if (document.activeElement !== yI) { if (yI) yI.value = r(bbox.y); }
+    if (document.activeElement !== wI) { if (wI) wI.value = r(bbox.w); }
+    if (document.activeElement !== hI) { if (hI) hI.value = r(bbox.h); }
+  },
+
+  _onSelectionChange(cmd, idx) {
+    if (cmd && (cmd.type === 'M' || cmd.type === 'L' || cmd.type === 'C')) {
+      document.getElementById('node-info-empty').style.display = 'none';
+      document.getElementById('node-editor').style.display = 'block';
+      const r = v => Math.round(v * 10) / 10;
+      document.getElementById('nx').value = r(cmd.x);
+      document.getElementById('ny').value = r(cmd.y);
+      if (cmd.type === 'C') {
+        document.getElementById('handle-section').style.display = 'block';
+        document.getElementById('h1x').value = r(cmd.cp1x);
+        document.getElementById('h1y').value = r(cmd.cp1y);
+        document.getElementById('h2x').value = r(cmd.cp2x);
+        document.getElementById('h2y').value = r(cmd.cp2y);
+      } else {
+        document.getElementById('handle-section').style.display = 'none';
+      }
+    } else {
+      document.getElementById('node-info-empty').style.display = 'block';
+      document.getElementById('node-editor').style.display = 'none';
+    }
+  },
+
+  _onZoomChange(z) {
+    document.getElementById('zoom-label').textContent = Math.round(z * 100) + '%';
+    const sl = document.getElementById('zoom-slider');
+    if (sl) sl.value = Math.round(50 + 25 * Math.log2(z));
+  },
+
+  // ─── UI Event Binding ─────────────────────────────────────────────────────────
+
+  _bindUIEvents() {
+    // Tool buttons
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.tool;
+        this.editor.setEditMode(mode);
+      });
+    });
+
+    // Zoom buttons
+    document.getElementById('zoom-in')?.addEventListener('click', () => {
+      const z = Math.min(5, this.editor.zoom * 1.3);
+      this.editor.setZoom(z);
+      this._onZoomChange(z);
+    });
+    document.getElementById('zoom-out')?.addEventListener('click', () => {
+      const z = Math.max(0.05, this.editor.zoom / 1.3);
+      this.editor.setZoom(z);
+      this._onZoomChange(z);
+    });
+    document.getElementById('fit-view')?.addEventListener('click', () => {
+      this.editor.fitToView();
+      this._onZoomChange(this.editor.zoom);
+    });
+
+    // Nav
+    document.getElementById('nav-prev')?.addEventListener('click', () => this._prevNextChar(-1));
+    document.getElementById('nav-next')?.addEventListener('click', () => this._prevNextChar(1));
+
+    // Advance width
+    document.getElementById('advance-width')?.addEventListener('change', e => {
+      const v = parseInt(e.target.value);
+      if (!isNaN(v) && v > 0) {
+        this.editor.setAdvanceWidth(v);
+        if (this.editor.glyph) this.editor.glyph.advanceWidth = v;
+      }
+    });
+
+    // SVG upload button
+    document.getElementById('upload-svg-btn')?.addEventListener('click', () => {
+      if (this.currentUnicode == null) return;
+      const inp = document.getElementById('svg-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('svg-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file && this.currentUnicode != null) this._importSVGForChar(this.currentUnicode, file);
+    });
+
+    // Batch upload
+    document.getElementById('batch-upload-btn')?.addEventListener('click', () => {
+      const inp = document.getElementById('batch-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('batch-file-input')?.addEventListener('change', e => {
+      this._batchImportSVGs(Array.from(e.target.files));
+    });
+
+    // Delete glyph
+    document.getElementById('delete-glyph-btn')?.addEventListener('click', () => {
+      if (this.currentUnicode == null) return;
+      delete this.project.glyphs[this.currentUnicode];
+      this.editor.loadGlyph({ unicode: this.currentUnicode, char: String.fromCodePoint(this.currentUnicode), advanceWidth: 600, pathData: [] });
+      this._refreshGlyphGrid();
+      this._notify('グリフを削除しました');
+    });
+
+    // Export buttons
+    document.getElementById('export-ttf')?.addEventListener('click', () => {
+      this._saveCurrentGlyph();
+      generateAndDownloadFont(this.project, 'ttf');
+      this._notify('TTFをダウンロードしています...');
+    });
+    document.getElementById('export-otf')?.addEventListener('click', () => {
+      this._saveCurrentGlyph();
+      generateAndDownloadFont(this.project, 'otf');
+      this._notify('OTFをダウンロードしています...');
+    });
+
+    // Save / Load project
+    document.getElementById('save-project')?.addEventListener('click', () => this._saveProject());
+    document.getElementById('load-project')?.addEventListener('click', () => {
+      const inp = document.getElementById('load-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('load-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) this._loadProject(file);
+    });
+
+    // Right tabs
+    document.querySelectorAll('.rtab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rtab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.rtab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById(`rtab-${tab}`)?.classList.add('active');
+        this.activeRightTab = tab;
+      });
+    });
+
+    // ── Transform tab ──
+    document.getElementById('tx')?.addEventListener('change', e => {
+      const bbox = this.editor.getBBox(); if (!bbox) return;
+      this.editor.setPosition(parseFloat(e.target.value) || 0, bbox.y);
+    });
+    document.getElementById('ty')?.addEventListener('change', e => {
+      const bbox = this.editor.getBBox(); if (!bbox) return;
+      this.editor.setPosition(bbox.x, parseFloat(e.target.value) || 0);
+    });
+    document.getElementById('tw')?.addEventListener('change', e => {
+      const bbox = this.editor.getBBox(); if (!bbox) return;
+      const lock = document.getElementById('lock-aspect')?.checked;
+      this.editor.scaleToSize(parseFloat(e.target.value) || bbox.w, lock ? (parseFloat(e.target.value) / bbox.w) * bbox.h : bbox.h, lock);
+    });
+    document.getElementById('th')?.addEventListener('change', e => {
+      const bbox = this.editor.getBBox(); if (!bbox) return;
+      const lock = document.getElementById('lock-aspect')?.checked;
+      this.editor.scaleToSize(lock ? (parseFloat(e.target.value) / bbox.h) * bbox.w : bbox.w, parseFloat(e.target.value) || bbox.h, lock);
+    });
+    document.getElementById('flip-h')?.addEventListener('click', () => this.editor.flipH());
+    document.getElementById('flip-v')?.addEventListener('click', () => this.editor.flipV());
+    document.getElementById('rotate-apply')?.addEventListener('click', () => {
+      const angle = parseFloat(document.getElementById('rotate-angle')?.value) || 0;
+      this.editor.rotate(angle);
+    });
+
+    // ── Nodes tab ──
+    document.getElementById('nx')?.addEventListener('change', e => {
+      const cmd = this.editor.getSelectedNodeData();
+      if (cmd) this.editor.updateSelectedNode(parseFloat(e.target.value) || 0, cmd.y);
+    });
+    document.getElementById('ny')?.addEventListener('change', e => {
+      const cmd = this.editor.getSelectedNodeData();
+      if (cmd) this.editor.updateSelectedNode(cmd.x, parseFloat(e.target.value) || 0);
+    });
+    document.getElementById('h1x')?.addEventListener('change', e => {
+      const sel = this.editor.selectedHandle;
+      if (sel) { const c = this.editor.getSelectedNodeData(); if (c) this.editor.updateSelectedHandle('cp1', parseFloat(e.target.value) || 0, c.cp1y); }
+    });
+    document.getElementById('h1y')?.addEventListener('change', e => {
+      const sel = this.editor.selectedHandle;
+      if (sel) { const c = this.editor.getSelectedNodeData(); if (c) this.editor.updateSelectedHandle('cp1', c.cp1x, parseFloat(e.target.value) || 0); }
+    });
+    document.getElementById('h2x')?.addEventListener('change', e => {
+      const cmd = this.editor.getSelectedNodeData();
+      if (cmd) this.editor.updateSelectedHandle('cp2', parseFloat(e.target.value) || 0, cmd.cp2y);
+    });
+    document.getElementById('h2y')?.addEventListener('change', e => {
+      const cmd = this.editor.getSelectedNodeData();
+      if (cmd) this.editor.updateSelectedHandle('cp2', cmd.cp2x, parseFloat(e.target.value) || 0);
+    });
+
+    // ── Path tools tab ──
+    document.getElementById('simplify-tol')?.addEventListener('input', e => {
+      document.getElementById('simplify-tol-val').textContent = e.target.value;
+    });
+    document.getElementById('smooth-steps')?.addEventListener('input', e => {
+      document.getElementById('smooth-steps-val').textContent = e.target.value;
+    });
+
+    document.getElementById('cleanup-btn')?.addEventListener('click', () => {
+      this.editor.applyCleanup();
+      this._notify('クリーンアップ完了');
+    });
+    document.getElementById('cleanup-all-btn')?.addEventListener('click', () => {
+      this._saveCurrentGlyph();
+      let count = 0;
+      for (const [uni, g] of Object.entries(this.project.glyphs)) {
+        if (g.pathData && g.pathData.length) { g.pathData = cleanupCmds(g.pathData); count++; }
+      }
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode] || this.editor.glyph);
+      this._notify(`${count}グリフをクリーンアップしました`);
+    });
+
+    document.getElementById('simplify-btn')?.addEventListener('click', () => {
+      const tol = parseFloat(document.getElementById('simplify-tol')?.value) || 2;
+      this.editor.applySimplify(tol);
+      this._notify(`パスを間引きました (tol=${tol})`);
+    });
+    document.getElementById('simplify-all-btn')?.addEventListener('click', () => {
+      const tol = parseFloat(document.getElementById('simplify-tol')?.value) || 2;
+      this._saveCurrentGlyph();
+      let count = 0;
+      for (const [uni, g] of Object.entries(this.project.glyphs)) {
+        if (g.pathData && g.pathData.length) { g.pathData = simplifyCmds(g.pathData, tol); count++; }
+      }
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode] || this.editor.glyph);
+      this._notify(`${count}グリフを間引きました`);
+    });
+
+    document.getElementById('smooth-btn')?.addEventListener('click', () => {
+      const steps = parseInt(document.getElementById('smooth-steps')?.value) || 3;
+      this.editor.applySmooth(steps);
+      this._notify(`曲線を平滑化しました (${steps}回)`);
+    });
+    document.getElementById('smooth-all-btn')?.addEventListener('click', () => {
+      const steps = parseInt(document.getElementById('smooth-steps')?.value) || 3;
+      this._saveCurrentGlyph();
+      let count = 0;
+      for (const [uni, g] of Object.entries(this.project.glyphs)) {
+        if (g.pathData && g.pathData.length) { g.pathData = smoothCmds(g.pathData, steps); count++; }
+      }
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode] || this.editor.glyph);
+      this._notify(`${count}グリフを平滑化しました`);
+    });
+
+    document.getElementById('fitbezier-btn')?.addEventListener('click', () => {
+      this.editor.applyFitBezier();
+      this._notify('スムーズベジェに変換しました');
+    });
+    document.getElementById('fitbezier-all-btn')?.addEventListener('click', () => {
+      this._saveCurrentGlyph();
+      let count = 0;
+      for (const [uni, g] of Object.entries(this.project.glyphs)) {
+        if (g.pathData && g.pathData.length) { g.pathData = fitSmoothBezier(g.pathData); count++; }
+      }
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode] || this.editor.glyph);
+      this._notify(`${count}グリフにスムーズベジェを適用しました`);
+    });
+
+    document.getElementById('reverse-btn')?.addEventListener('click', () => {
+      this.editor.applyReverse();
+      this._notify('パスの向きを逆にしました');
+    });
+
+    // ── Reference font ──
+    document.getElementById('ref-font-select')?.addEventListener('change', e => {
+      this.editor.setReferenceFont(e.target.value);
+    });
+    document.getElementById('show-reference')?.addEventListener('change', e => {
+      this.editor.setShowReference(e.target.checked);
+    });
+    document.getElementById('show-handles')?.addEventListener('change', e => {
+      this.editor.setShowHandles(e.target.checked);
+    });
+
+    // ── Settings panel ──
+    document.getElementById('settings-form')?.addEventListener('submit', e => {
+      e.preventDefault();
+      this.project.name = document.getElementById('s-name').value || 'MyFont';
+      this.project.style = document.getElementById('s-style').value || 'Regular';
+      this.project.upm = parseInt(document.getElementById('s-upm').value) || 1000;
+      this.project.ascender = parseInt(document.getElementById('s-ascender').value) || 800;
+      this.project.descender = parseInt(document.getElementById('s-descender').value) || -200;
+      this.project.capHeight = parseInt(document.getElementById('s-capheight').value) || 700;
+      this.project.xHeight = parseInt(document.getElementById('s-xheight').value) || 500;
+      this.project.defaultLsb = parseInt(document.getElementById('s-lsb').value) || 50;
+      this.project.defaultRsb = parseInt(document.getElementById('s-rsb').value) || 50;
+      // Update editor options
+      this.editor.options = { ...this.editor.options, ...this.project };
+      this.editor.render();
+      this._notify('設定を保存しました');
+      document.getElementById('settings-panel')?.classList.remove('open');
+    });
+
+    // Settings toggle
+    document.getElementById('settings-btn')?.addEventListener('click', () => {
+      document.getElementById('settings-panel')?.classList.toggle('open');
+    });
+    document.getElementById('settings-close')?.addEventListener('click', () => {
+      document.getElementById('settings-panel')?.classList.remove('open');
+    });
+
+    // ── Preview tab ──
+    document.getElementById('preview-text')?.addEventListener('input', () => this._renderPreview());
+    document.getElementById('preview-size')?.addEventListener('input', e => {
+      document.getElementById('preview-size-label').textContent = e.target.value + 'px';
+      this._renderPreview();
+    });
+    document.getElementById('preview-bg')?.addEventListener('change', () => this._renderPreview());
+    document.getElementById('update-preview-btn')?.addEventListener('click', () => {
+      this._saveCurrentGlyph();
+      this._loadFontForPreview();
+    });
+
+    // Main tab switching (Editor / Preview)
+    document.querySelectorAll('.main-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('editor-view').style.display = tab === 'editor' ? 'flex' : 'none';
+        document.getElementById('preview-view').style.display = tab === 'preview' ? 'flex' : 'none';
+        if (tab === 'preview') this._loadFontForPreview();
+      });
+    });
+  },
+
+  // ─── Drop zone ───────────────────────────────────────────────────────────────
+
+  _bindDropZone() {
+    const editorContainer = document.getElementById('editor-container');
+    if (!editorContainer) return;
+    editorContainer.addEventListener('dragover', e => { e.preventDefault(); editorContainer.classList.add('drag-over'); });
+    editorContainer.addEventListener('dragleave', () => editorContainer.classList.remove('drag-over'));
+    editorContainer.addEventListener('drop', e => {
+      e.preventDefault(); editorContainer.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && this.currentUnicode != null) this._importSVGForChar(this.currentUnicode, file);
+    });
+  },
+
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+
+  _bindKeyboard() {
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft') this._prevNextChar(-1);
+      else if (e.key === 'ArrowRight') this._prevNextChar(1);
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.editor.selectedNode >= 0) this.editor.deleteSelectedNode();
+      } else if (e.key === 'f' || e.key === 'F') this.editor.fitToView();
+      else if (e.key === '+' || e.key === '=') { const z = Math.min(5, this.editor.zoom * 1.3); this.editor.setZoom(z); this._onZoomChange(z); }
+      else if (e.key === '-') { const z = Math.max(0.05, this.editor.zoom / 1.3); this.editor.setZoom(z); this._onZoomChange(z); }
+    });
+  },
+
+  // ─── Preview ─────────────────────────────────────────────────────────────────
+
+  _loadFontForPreview() {
+    this._saveCurrentGlyph();
+    const hasGlyphs = Object.keys(this.project.glyphs).some(k => this.project.glyphs[k]?.pathData?.length > 0);
+    if (!hasGlyphs) { this._notify('プレビューするグリフがありません', 'error'); return; }
+
+    if (typeof opentype === 'undefined') { this._notify('opentype.js が読み込まれていません', 'error'); return; }
+    try {
+      const upm = this.project.upm || 1000;
+      const ascender = this.project.ascender || 800;
+      const descender = this.project.descender || -200;
+
+      const notdefPath = new opentype.Path();
+      notdefPath.moveTo(50, 0); notdefPath.lineTo(50, 700); notdefPath.lineTo(450, 700); notdefPath.lineTo(450, 0); notdefPath.close();
+      const notdefGlyph = new opentype.Glyph({ name: '.notdef', unicode: 0, advanceWidth: 500, path: notdefPath });
+
+      const glyphs = [notdefGlyph];
+      for (const [unicodeStr, glyph] of Object.entries(this.project.glyphs)) {
+        const unicode = parseInt(unicodeStr);
+        if (!glyph.pathData || !glyph.pathData.length) continue;
+        const otPath = new opentype.Path();
+        for (const c of glyph.pathData) {
+          if (c.type === 'M') otPath.moveTo(c.x, c.y);
+          else if (c.type === 'L') otPath.lineTo(c.x, c.y);
+          else if (c.type === 'C') otPath.bezierCurveTo(c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y);
+          else if (c.type === 'Z') otPath.close();
+        }
+        glyphs.push(new opentype.Glyph({ name: `uni${unicode.toString(16).toUpperCase().padStart(4, '0')}`, unicode, advanceWidth: glyph.advanceWidth || 600, path: otPath }));
+      }
+
+      const font = new opentype.Font({ familyName: this.project.name || 'MyFont', styleName: 'Regular', unitsPerEm: upm, ascender, descender, glyphs });
+      // Use toArrayBuffer for preview
+      const ab = font.toArrayBuffer ? font.toArrayBuffer() : this._fontToArrayBuffer(font);
+      const blob = new Blob([ab], { type: 'font/truetype' });
+      const url = URL.createObjectURL(blob);
+      const familyName = `PreviewFont_${++this.previewFontKey}`;
+      const ff = new FontFace(familyName, `url('${url}')`);
+      ff.load().then(face => {
+        document.fonts.add(face);
+        this.previewFontFamily = familyName;
+        this._renderPreview();
+        this._notify('プレビューを更新しました');
+      }).catch(err => {
+        console.error(err);
+        this._notify('フォントのロードに失敗しました', 'error');
+      });
+    } catch (err) {
+      console.error(err);
+      this._notify('プレビュー生成に失敗: ' + err.message, 'error');
+    }
+  },
+
+  _fontToArrayBuffer(font) {
+    // opentype.js font.toArrayBuffer() method
+    if (font.toArrayBuffer) return font.toArrayBuffer();
+    return new ArrayBuffer(0);
+  },
+
+  _renderPreview() {
+    const container = document.getElementById('preview-display');
+    if (!container) return;
+    const text = document.getElementById('preview-text')?.value || 'Hello World!';
+    const size = parseInt(document.getElementById('preview-size')?.value) || 48;
+    const bg = document.getElementById('preview-bg')?.value || 'white';
+    container.style.backgroundColor = bg === 'black' ? '#111' : bg === 'gray' ? '#888' : '#fff';
+    container.style.color = bg === 'black' ? '#fff' : '#000';
+
+    const lines = text.split('\n');
+    container.innerHTML = '';
+    for (const line of lines) {
+      const div = document.createElement('div');
+      div.style.fontFamily = this.previewFontFamily ? `'${this.previewFontFamily}', sans-serif` : 'sans-serif';
+      div.style.fontSize = size + 'px';
+      div.style.lineHeight = '1.4';
+      div.style.whiteSpace = 'pre';
+      div.textContent = line || ' ';
+      container.appendChild(div);
+    }
+  },
+
+  // ─── Settings Form ────────────────────────────────────────────────────────────
+
+  _updateSettingsForm() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('s-name', this.project.name);
+    set('s-style', this.project.style);
+    set('s-upm', this.project.upm);
+    set('s-ascender', this.project.ascender);
+    set('s-descender', this.project.descender);
+    set('s-capheight', this.project.capHeight);
+    set('s-xheight', this.project.xHeight);
+    set('s-lsb', this.project.defaultLsb);
+    set('s-rsb', this.project.defaultRsb);
+    if (document.getElementById('font-name-display')) document.getElementById('font-name-display').textContent = this.project.name;
+  },
+
+  // ─── Project Save/Load ────────────────────────────────────────────────────────
+
+  _saveProject() {
+    this._saveCurrentGlyph();
+    const data = JSON.stringify(this.project, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${this.project.name}.fontproj`;
+    a.click(); URL.revokeObjectURL(url);
+    this._notify('プロジェクトを保存しました');
+  },
+
+  _loadProject(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.glyphs) throw new Error('無効なプロジェクトファイルです');
+        this.project = data;
+        this._buildGlyphGrid();
+        this._updateSettingsForm();
+        const firstUni = parseInt(Object.keys(data.glyphs)[0]) || 65;
+        this.currentUnicode = null;
+        this.selectChar(firstUni);
+        this._notify('プロジェクトを読み込みました');
+      } catch (err) {
+        this._notify('読み込みエラー: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  // ─── Notification ─────────────────────────────────────────────────────────────
+
+  _notify(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `notification ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  },
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+});
+
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const hint = document.getElementById('upload-hint');
+  if (hint && App.editor) {
+    const origLoadGlyph = App.editor.loadGlyph.bind(App.editor);
+    App.editor.loadGlyph = function(glyph) {
+      origLoadGlyph(glyph);
+      if (hint) hint.classList.toggle('hidden', !!(glyph && glyph.pathData && glyph.pathData.length > 0));
+    };
+  }
+});
+</script>
+</body>
+</html>
