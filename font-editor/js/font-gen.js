@@ -70,14 +70,18 @@ function generateAndDownloadFont(project, format = 'ttf') {
     return;
   }
 
-  const font = new opentype.Font({
+  const fontOpts = {
     familyName: project.name || 'MyFont',
     styleName: project.style || 'Regular',
     unitsPerEm: upm,
     ascender,
     descender,
     glyphs,
-  });
+  };
+  if (project.description) {
+    fontOpts.description = project.description;
+  }
+  const font = new opentype.Font(fontOpts);
 
   // Add kerning pairs if available
   if (project.kerning && Object.keys(project.kerning).length > 0) {

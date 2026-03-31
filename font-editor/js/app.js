@@ -33,6 +33,7 @@ const App = {
   project: {
     name: 'MyFont',
     style: 'Regular',
+    description: '',
     upm: 1000,
     ascender: 800,
     descender: -200,
@@ -482,9 +483,24 @@ const App = {
       this._batchImportSVGs(Array.from(e.target.files));
     });
 
-    // Template download/upload
-    document.getElementById('template-with-ref-btn')?.addEventListener('click', () => this._downloadTemplate(true));
-    document.getElementById('template-no-ref-btn')?.addEventListener('click', () => this._downloadTemplate(false));
+    // Template dialog
+    document.getElementById('template-btn')?.addEventListener('click', () => {
+      document.getElementById('template-dialog').style.display = 'flex';
+    });
+    document.getElementById('template-dialog-close')?.addEventListener('click', () => {
+      document.getElementById('template-dialog').style.display = 'none';
+    });
+    document.getElementById('template-dialog')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+    });
+    document.getElementById('tpl-with-ref')?.addEventListener('click', () => {
+      document.getElementById('template-dialog').style.display = 'none';
+      this._downloadTemplate(true);
+    });
+    document.getElementById('tpl-no-ref')?.addEventListener('click', () => {
+      document.getElementById('template-dialog').style.display = 'none';
+      this._downloadTemplate(false);
+    });
     document.getElementById('template-upload-btn')?.addEventListener('click', () => {
       const inp = document.getElementById('template-file-input');
       inp.value = '';
@@ -750,6 +766,7 @@ const App = {
       e.preventDefault();
       this.project.name = document.getElementById('s-name').value || 'MyFont';
       this.project.style = document.getElementById('s-style').value || 'Regular';
+      this.project.description = document.getElementById('s-description').value || '';
       this.project.upm = parseInt(document.getElementById('s-upm').value) || 1000;
       this.project.ascender = parseInt(document.getElementById('s-ascender').value) || 800;
       this.project.descender = parseInt(document.getElementById('s-descender').value) || -200;
@@ -916,6 +933,7 @@ const App = {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     set('s-name', this.project.name);
     set('s-style', this.project.style);
+    set('s-description', this.project.description || '');
     set('s-upm', this.project.upm);
     set('s-ascender', this.project.ascender);
     set('s-descender', this.project.descender);

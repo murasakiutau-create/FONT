@@ -232,11 +232,11 @@ class GlyphEditor {
     const d = cmdsToDString(pathData);
     const pathEl = this._el('path', {
       d,
-      fill: '#e0e0e0',
+      fill: '#000000',
       'fill-rule': 'evenodd',
       stroke: '#000000',
       'stroke-width': String(1 / this.zoom),
-      opacity: '0.9',
+      opacity: '1',
       class: 'glyph-path',
     });
     this.pathsLayer.appendChild(pathEl);
