@@ -59,8 +59,22 @@ const App = {
   previewFontKey: 0,
   undoStack: [],
   redoStack: [],
+  projectId: null,
 
   init() {
+    // Load project from URL parameter if available
+    const params = new URLSearchParams(window.location.search);
+    this.projectId = params.get('project');
+    if (this.projectId) {
+      try {
+        const saved = localStorage.getItem('svgfontmaker_data_' + this.projectId);
+        if (saved) {
+          const data = JSON.parse(saved);
+          this.project = { ...this.project, ...data };
+        }
+      } catch (e) { console.warn('Failed to load project:', e); }
+    }
+
     this.editor = new GlyphEditor(document.getElementById('editor-svg'), {
       upm: this.project.upm,
       ascender: this.project.ascender,
@@ -80,6 +94,11 @@ const App = {
     this._bindGlyphSearch();
     this.selectChar(65); // Start with 'A'
     this._updateSettingsForm();
+
+    // Auto-save every 30 seconds
+    if (this.projectId) {
+      setInterval(() => this._autoSave(), 30000);
+    }
 
     // Bind zoom slider
     const zSlider = document.getElementById('zoom-slider');
@@ -904,6 +923,13 @@ const App = {
       document.getElementById('settings-panel')?.classList.remove('open');
     });
 
+    // Back to projects (auto-save)
+    document.getElementById('back-to-projects')?.addEventListener('click', (e) => {
+      this._autoSave();
+    });
+    // Auto-save on page unload
+    window.addEventListener('beforeunload', () => this._autoSave());
+
     // ── Preview tab ──
     document.getElementById('preview-text')?.addEventListener('input', () => this._renderPreview());
     document.getElementById('preview-size')?.addEventListener('input', e => {
@@ -1128,6 +1154,9 @@ const App = {
 
   _saveProject() {
     this._saveCurrentGlyph();
+    // Save to localStorage if project has an ID
+    this._autoSave();
+    // Also download as file
     const data = JSON.stringify(this.project, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1135,6 +1164,14 @@ const App = {
     a.href = url; a.download = `${this.project.name}.fontproj`;
     a.click(); URL.revokeObjectURL(url);
     this._notify('プロジェクトを保存しました');
+  },
+
+  _autoSave() {
+    if (!this.projectId) return;
+    this._saveCurrentGlyph();
+    try {
+      localStorage.setItem('svgfontmaker_data_' + this.projectId, JSON.stringify(this.project));
+    } catch (e) { console.warn('Auto-save failed:', e); }
   },
 
   _loadProject(file) {
