@@ -328,7 +328,7 @@ class GlyphEditor {
   }
 
   _onMousedown(e) {
-    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer')) {
+    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer')) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
       if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
@@ -336,12 +336,17 @@ class GlyphEditor {
         e.preventDefault(); return;
       }
       if (this.editMode === 'select' || this.editMode === 'node') {
+        // Check if clicking on the glyph path for move (select mode only)
+        if (this.editMode === 'select' && this.glyph && this.glyph.pathData.length > 0) {
+          const b = getCmdsBounds(this.glyph.pathData);
+          if (b.w > 0 && fp.x >= b.x && fp.x <= b.x + b.w && fp.y >= b.y && fp.y <= b.y + b.h) {
+            this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
+            return;
+          }
+        }
         this.selectedNode = -1; this.selectedHandle = null;
         this._renderNodes();
         if (this.options.onSelectionChange) this.options.onSelectionChange(null, null);
-      }
-      if (this.editMode === 'move' && this.glyph) {
-        this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
       }
     }
   }
@@ -405,7 +410,7 @@ class GlyphEditor {
       const fp0 = this.screenToFont(ds.startSx, ds.startSy);
       const dx = fp.x - fp0.x, dy = fp.y - fp0.y;
       this.glyph.pathData = transformCmds(JSON.parse(JSON.stringify(ds.origData)), dx, dy, 1, 1);
-      this._renderPaths(); this._renderNodes(); this._notifyBBox(); this._notifyChange();
+      this._renderPaths(); this._renderNodes(); this._renderResizeHandles(); this._notifyBBox(); this._notifyChange();
     }
     if (ds.type === 'resize') {
       const fp = this.screenToFont(sx, sy);
@@ -652,7 +657,7 @@ class GlyphEditor {
 
   setEditMode(mode) {
     this.editMode = mode;
-    this.svg.style.cursor = mode === 'move' ? 'grab' : 'default';
+    this.svg.style.cursor = 'default';
     this.render();
   }
 

@@ -89,9 +89,6 @@
           <button class="tool-btn" data-tool="node" title="ノード編集 (N)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="7" x2="10" y2="10"/><line x1="17" y1="7" x2="14" y2="10"/><line x1="7" y1="17" x2="10" y2="14"/><line x1="17" y1="17" x2="14" y2="14"/></svg>
           </button>
-          <button class="tool-btn" data-tool="move" title="移動ツール (M)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
-          </button>
 
           <div class="tb-sep"></div>
 
@@ -192,7 +189,6 @@ abcdefghijklmnopqrstuvwxyz
       <div class="rtab-bar">
         <button class="rtab-btn active" data-tab="transform">変形</button>
         <button class="rtab-btn" data-tab="nodes">ノード</button>
-        <button class="rtab-btn" data-tab="scale">拡縮</button>
         <button class="rtab-btn" data-tab="bearing">ベアリング</button>
         <button class="rtab-btn" data-tab="kerning">カーニング</button>
         <button class="rtab-btn" data-tab="pathtools">パス</button>
@@ -275,17 +271,6 @@ abcdefghijklmnopqrstuvwxyz
         </div>
       </div>
 
-      <!-- ── Scale Tab ── -->
-      <div id="rtab-scale" class="rtab-content">
-        <div class="section-hdr">SVG拡大縮小</div>
-        <p style="font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.5">
-          選択ツール(S)でグリフの周りに表示される<strong>□ハンドル</strong>をドラッグしてサイズ変更できます。
-        </p>
-        <div style="font-size:10px;color:var(--text3);line-height:1.6;margin-bottom:8px">
-          ■ 四隅 → 自由に拡大縮小<br>
-          ■ 辺の中央 → 縦 or 横のみ変更
-        </div>
-      </div>
 
       <!-- ── Bearing Tab ── -->
       <div id="rtab-bearing" class="rtab-content">
