@@ -1245,7 +1245,7 @@ const App = {
   .char-label { font-family: sans-serif; font-size: ${cellSize * 0.06}px; fill: #aaa; }
   .ref-char { font-family: sans-serif; font-size: ${cellSize * 0.7}px; fill: ${textColor}; text-anchor: middle; dominant-baseline: alphabetic; }
 </style>
-<rect width="100%" height="100%" fill="white"/>
+<rect data-template="1" width="100%" height="100%" fill="white"/>
 `;
 
     for (let i = 0; i < chars.length; i++) {
@@ -1264,27 +1264,27 @@ const App = {
       const xhY = y + ((ascender - xHeight) / fontH) * cellSize;
 
       // Cell border
-      svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" class="cell-border"/>
+      svg += `<rect data-template="1" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" class="cell-border"/>
 `;
       // Guide lines
-      svg += `<line x1="${x}" y1="${capY}" x2="${x + cellSize}" y2="${capY}" class="guide"/>
+      svg += `<line data-template="1" x1="${x}" y1="${capY}" x2="${x + cellSize}" y2="${capY}" class="guide"/>
 `;
-      svg += `<line x1="${x}" y1="${xhY}" x2="${x + cellSize}" y2="${xhY}" class="guide"/>
+      svg += `<line data-template="1" x1="${x}" y1="${xhY}" x2="${x + cellSize}" y2="${xhY}" class="guide"/>
 `;
       // Baseline (solid)
-      svg += `<line x1="${x}" y1="${baseY}" x2="${x + cellSize}" y2="${baseY}" class="baseline"/>
+      svg += `<line data-template="1" x1="${x}" y1="${baseY}" x2="${x + cellSize}" y2="${baseY}" class="baseline"/>
 `;
       // Unicode label top-left
-      svg += `<text x="${x + 4}" y="${y + cellSize * 0.08}" class="char-label">${uLabel}</text>
+      svg += `<text data-template="1" x="${x + 4}" y="${y + cellSize * 0.08}" class="char-label">${uLabel}</text>
 `;
       // Character label top-right
       const displayChar = char === ' ' ? 'Space' : char.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      svg += `<text x="${x + cellSize - 4}" y="${y + cellSize * 0.08}" class="char-label" text-anchor="end">${displayChar}</text>
+      svg += `<text data-template="1" x="${x + cellSize - 4}" y="${y + cellSize * 0.08}" class="char-label" text-anchor="end">${displayChar}</text>
 `;
       // Reference character (light, as guide)
-      svg += `<text x="${x + cellSize / 2}" y="${baseY}" class="ref-char">${displayChar}</text>
+      svg += `<text data-template="1" x="${x + cellSize / 2}" y="${baseY}" class="ref-char">${displayChar}</text>
 `;
-      // Placeholder group for user drawing - marked with data attribute
+      // Placeholder group for user drawing
       svg += `<g id="glyph-${uLabel}" data-unicode="${unicode}" data-char="${displayChar}">
 </g>
 `;
@@ -1339,23 +1339,26 @@ const App = {
           const combined = multiplyMatrix(parentMatrix, localMatrix);
 
           if (shapeTypes.includes(el.tagName)) {
-            // Skip template elements: those with class, or inside <style>/<defs>
+            // Skip template elements by data-template attribute (on self or any ancestor)
+            if (el.getAttribute('data-template')) return;
+            if (el.closest('[data-template]')) return;
+            // Skip elements with template CSS classes
             if (el.getAttribute('class')) return;
+            // Skip style/defs children
             if (el.closest('style') || el.closest('defs')) return;
-            // Skip template ref-char text (these are <text>, not shapes, so already excluded)
 
             let cmds = [];
             if (el.tagName === 'path') {
               const d = el.getAttribute('d');
               if (d) cmds = parseSVGPath(d);
             } else if (el.tagName === 'rect') {
-              // Skip template cell borders (stroke only, no fill or fill=none)
-              const fill = el.getAttribute('fill');
-              const stroke = el.getAttribute('stroke');
-              if ((!fill || fill === 'none') && stroke) return;
               const rx = parseFloat(el.getAttribute('x') || 0), ry = parseFloat(el.getAttribute('y') || 0);
               const rw = parseFloat(el.getAttribute('width') || 0), rh = parseFloat(el.getAttribute('height') || 0);
               if (rw === 0 || rh === 0) return;
+              // Skip background rects (percentage or very large)
+              const wAttr = el.getAttribute('width') || '';
+              const hAttr = el.getAttribute('height') || '';
+              if (wAttr.includes('%') || hAttr.includes('%')) return;
               cmds = [{ type: 'M', x: rx, y: ry }, { type: 'L', x: rx + rw, y: ry }, { type: 'L', x: rx + rw, y: ry + rh }, { type: 'L', x: rx, y: ry + rh }, { type: 'Z' }];
             } else if (el.tagName === 'circle') {
               const cx = parseFloat(el.getAttribute('cx') || 0), cy = parseFloat(el.getAttribute('cy') || 0), r = parseFloat(el.getAttribute('r') || 0);
