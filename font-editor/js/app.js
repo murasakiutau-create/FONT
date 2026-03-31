@@ -299,8 +299,78 @@ const App = {
   // ─── Editor callbacks ─────────────────────────────────────────────────────────
 
   _onGlyphChange(glyph) {
+    // Push to undo stack (debounced to avoid flooding)
+    clearTimeout(this._undoDebounce);
+    this._undoDebounce = setTimeout(() => {
+      this._pushUndo();
+    }, 300);
     this.project.glyphs[glyph.unicode] = glyph;
     this._refreshGlyphGrid();
+  },
+
+  _pushUndo() {
+    const snapshot = {
+      unicode: this.currentUnicode,
+      glyph: this.editor ? this.editor.getGlyph() : null,
+    };
+    this.undoStack.push(snapshot);
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack = [];
+    this._updateUndoButtons();
+  },
+
+  _undo() {
+    if (!this.undoStack.length) return;
+    // Save current state to redo
+    const current = {
+      unicode: this.currentUnicode,
+      glyph: this.editor ? this.editor.getGlyph() : null,
+    };
+    this.redoStack.push(current);
+    if (this.redoStack.length > 30) this.redoStack.shift();
+
+    const state = this.undoStack.pop();
+    this._restoreState(state);
+    this._updateUndoButtons();
+  },
+
+  _redo() {
+    if (!this.redoStack.length) return;
+    // Save current state to undo
+    const current = {
+      unicode: this.currentUnicode,
+      glyph: this.editor ? this.editor.getGlyph() : null,
+    };
+    this.undoStack.push(current);
+
+    const state = this.redoStack.pop();
+    this._restoreState(state);
+    this._updateUndoButtons();
+  },
+
+  _restoreState(state) {
+    if (!state || !state.glyph) return;
+    // Navigate to the glyph's unicode if different
+    if (state.unicode !== this.currentUnicode) {
+      this.currentUnicode = state.unicode;
+      const char = String.fromCodePoint(state.unicode);
+      document.getElementById('current-char-label').textContent = char === ' ' ? 'Space' : char;
+      document.getElementById('current-unicode-label').textContent = `U+${state.unicode.toString(16).toUpperCase().padStart(4, '0')}`;
+      this._refreshGlyphGrid();
+      this._refreshNavButtons();
+    }
+    this.project.glyphs[state.unicode] = JSON.parse(JSON.stringify(state.glyph));
+    this.editor.loadGlyph(state.glyph);
+    document.getElementById('advance-width').value = state.glyph.advanceWidth;
+    this._updateBearingDisplay();
+    this._refreshGlyphGrid();
+  },
+
+  _updateUndoButtons() {
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    if (undoBtn) undoBtn.disabled = this.undoStack.length === 0;
+    if (redoBtn) redoBtn.disabled = this.redoStack.length === 0;
   },
 
   _onBBoxChange(bbox) {
@@ -347,15 +417,19 @@ const App = {
   // ─── UI Event Binding ─────────────────────────────────────────────────────────
 
   _bindUIEvents() {
-    // Tool buttons
-    document.querySelectorAll('.tool-btn').forEach(btn => {
+    // Tool buttons (only those with data-tool)
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const mode = btn.dataset.tool;
         this.editor.setEditMode(mode);
       });
     });
+
+    // Undo / Redo buttons
+    document.getElementById('undo-btn')?.addEventListener('click', () => this._undo());
+    document.getElementById('redo-btn')?.addEventListener('click', () => this._redo());
 
     // Zoom buttons
     document.getElementById('zoom-in')?.addEventListener('click', () => {
@@ -728,6 +802,9 @@ const App = {
 
   _bindKeyboard() {
     document.addEventListener('keydown', e => {
+      // Ctrl+Z / Ctrl+Y work even in inputs
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); this._undo(); return; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); this._redo(); return; }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (e.key === 'ArrowLeft') this._prevNextChar(-1);
       else if (e.key === 'ArrowRight') this._prevNextChar(1);
