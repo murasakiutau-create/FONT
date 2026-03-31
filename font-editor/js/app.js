@@ -483,7 +483,8 @@ const App = {
     });
 
     // Template download/upload
-    document.getElementById('template-download-btn')?.addEventListener('click', () => this._downloadTemplate());
+    document.getElementById('template-with-ref-btn')?.addEventListener('click', () => this._downloadTemplate(true));
+    document.getElementById('template-no-ref-btn')?.addEventListener('click', () => this._downloadTemplate(false));
     document.getElementById('template-upload-btn')?.addEventListener('click', () => {
       const inp = document.getElementById('template-file-input');
       inp.value = '';
@@ -1217,8 +1218,8 @@ const App = {
 
   // ─── Template ─────────────────────────────────────────────────────────────────
 
-  _downloadTemplate() {
-    const { ascender, descender, upm, capHeight, xHeight, defaultLsb, defaultRsb } = this.project;
+  _downloadTemplate(withRef = true) {
+    const { ascender, descender, upm, capHeight, xHeight } = this.project;
     const fontH = ascender - descender;
     const cellSize = upm;
     const cols = 10;
@@ -1231,19 +1232,19 @@ const App = {
     const rows = Math.ceil(chars.length / cols);
     const svgW = cols * cellSize;
     const svgH = rows * cellSize;
-    const guideColor = '#ccc';
-    const baselineColor = '#999';
-    const textColor = '#e0e0e0';
+    const labelSize = Math.round(cellSize * 0.05);
+    const charLabelSize = Math.round(cellSize * 0.08);
 
     let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
 <!-- FONT_TEMPLATE cols="${cols}" cellSize="${cellSize}" upm="${upm}" ascender="${ascender}" descender="${descender}" capHeight="${capHeight}" xHeight="${xHeight}" -->
 <style>
   .cell-border { fill: none; stroke: #000; stroke-width: 1; }
-  .guide { stroke: ${guideColor}; stroke-width: 0.5; stroke-dasharray: 4,4; }
-  .baseline { stroke: ${baselineColor}; stroke-width: 1; }
-  .char-label { font-family: sans-serif; font-size: ${cellSize * 0.06}px; fill: #aaa; }
-  .ref-char { font-family: sans-serif; font-size: ${cellSize * 0.7}px; fill: ${textColor}; text-anchor: middle; dominant-baseline: alphabetic; }
+  .guide { stroke: #ccc; stroke-width: 0.5; stroke-dasharray: 4,4; }
+  .baseline { stroke: #999; stroke-width: 1; }
+  .u-label { font-family: monospace; font-size: ${labelSize}px; fill: #999; }
+  .c-label { font-family: sans-serif; font-size: ${charLabelSize}px; fill: #bbb; font-weight: bold; }
+  .ref-char { font-family: sans-serif; font-size: ${cellSize * 0.7}px; fill: #e0e0e0; text-anchor: middle; dominant-baseline: alphabetic; }
 </style>
 <rect data-template="1" width="100%" height="100%" fill="white"/>
 `;
@@ -1255,13 +1256,10 @@ const App = {
       const y = row * cellSize;
       const { char, unicode } = chars[i];
       const uLabel = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')}`;
-      // Cell coordinate system: top of cell = ascender, bottom extends to descender
-      // Baseline is at y + (ascender / fontH) * cellSize from top
       const baseY = y + (ascender / fontH) * cellSize;
-      const ascY = y;
-      const descY = y + cellSize;
       const capY = y + ((ascender - capHeight) / fontH) * cellSize;
       const xhY = y + ((ascender - xHeight) / fontH) * cellSize;
+      const displayChar = char === ' ' ? 'Space' : char.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
       // Cell border
       svg += `<rect data-template="1" x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" class="cell-border"/>
@@ -1271,19 +1269,31 @@ const App = {
 `;
       svg += `<line data-template="1" x1="${x}" y1="${xhY}" x2="${x + cellSize}" y2="${xhY}" class="guide"/>
 `;
-      // Baseline (solid)
+      // Baseline
       svg += `<line data-template="1" x1="${x}" y1="${baseY}" x2="${x + cellSize}" y2="${baseY}" class="baseline"/>
 `;
-      // Unicode label top-left
-      svg += `<text data-template="1" x="${x + 4}" y="${y + cellSize * 0.08}" class="char-label">${uLabel}</text>
+
+      if (withRef) {
+        // === お手本付き ===
+        // Unicode label (small, top-left)
+        svg += `<text data-template="1" x="${x + 4}" y="${y + labelSize + 2}" class="u-label">${uLabel}</text>
 `;
-      // Character label top-right
-      const displayChar = char === ' ' ? 'Space' : char.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      svg += `<text data-template="1" x="${x + cellSize - 4}" y="${y + cellSize * 0.08}" class="char-label" text-anchor="end">${displayChar}</text>
+        // Character label (small, top-right)
+        svg += `<text data-template="1" x="${x + cellSize - 4}" y="${y + labelSize + 2}" class="u-label" text-anchor="end">${displayChar}</text>
 `;
-      // Reference character (light, as guide)
-      svg += `<text data-template="1" x="${x + cellSize / 2}" y="${baseY}" class="ref-char">${displayChar}</text>
+        // Reference character
+        svg += `<text data-template="1" x="${x + cellSize / 2}" y="${baseY}" class="ref-char">${displayChar}</text>
 `;
+      } else {
+        // === お手本なし（枠のみ） ===
+        // Unicode label centered at top
+        svg += `<text data-template="1" x="${x + cellSize / 2}" y="${y + labelSize + 3}" class="u-label" text-anchor="middle">${uLabel}</text>
+`;
+        // Character label centered below unicode
+        svg += `<text data-template="1" x="${x + cellSize / 2}" y="${y + labelSize + charLabelSize + 6}" class="c-label" text-anchor="middle">${displayChar}</text>
+`;
+      }
+
       // Placeholder group for user drawing
       svg += `<g id="glyph-${uLabel}" data-unicode="${unicode}" data-char="${displayChar}">
 </g>
@@ -1292,14 +1302,15 @@ const App = {
 
     svg += `</svg>`;
 
+    const suffix = withRef ? 'with_ref' : 'no_ref';
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${this.project.name || 'MyFont'}_template.svg`;
+    a.download = `${this.project.name || 'MyFont'}_template_${suffix}.svg`;
     a.click();
     URL.revokeObjectURL(url);
-    this._notify('テンプレートをダウンロードしました。文字を描いてから「テンプレ取込」で読み込んでください。');
+    this._notify(withRef ? 'お手本付きテンプレートをダウンロードしました' : '枠のみテンプレートをダウンロードしました');
   },
 
   _importTemplate(file) {
