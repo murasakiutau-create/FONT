@@ -482,6 +482,18 @@ const App = {
       this._batchImportSVGs(Array.from(e.target.files));
     });
 
+    // Template download/upload
+    document.getElementById('template-download-btn')?.addEventListener('click', () => this._downloadTemplate());
+    document.getElementById('template-upload-btn')?.addEventListener('click', () => {
+      const inp = document.getElementById('template-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('template-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) this._importTemplate(file);
+    });
+
     // Delete glyph
     document.getElementById('delete-glyph-btn')?.addEventListener('click', () => {
       if (this.currentUnicode == null) return;
@@ -1201,6 +1213,253 @@ const App = {
       tr.innerHTML = `<td colspan="3" style="color:var(--text3);text-align:center">…他 ${pairs.length - 50}ペア</td>`;
       tbody.appendChild(tr);
     }
+  },
+
+  // ─── Template ─────────────────────────────────────────────────────────────────
+
+  _downloadTemplate() {
+    const { ascender, descender, upm, capHeight, xHeight, defaultLsb, defaultRsb } = this.project;
+    const fontH = ascender - descender;
+    const cellSize = upm;
+    const cols = 10;
+    const chars = [];
+    for (const g of CHAR_GROUPS) {
+      for (const ch of g.chars) {
+        chars.push({ char: ch, unicode: ch.codePointAt(0) });
+      }
+    }
+    const rows = Math.ceil(chars.length / cols);
+    const svgW = cols * cellSize;
+    const svgH = rows * cellSize;
+    const guideColor = '#ccc';
+    const baselineColor = '#999';
+    const textColor = '#e0e0e0';
+
+    let svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
+<!-- FONT_TEMPLATE cols="${cols}" cellSize="${cellSize}" upm="${upm}" ascender="${ascender}" descender="${descender}" capHeight="${capHeight}" xHeight="${xHeight}" -->
+<style>
+  .cell-border { fill: none; stroke: #000; stroke-width: 1; }
+  .guide { stroke: ${guideColor}; stroke-width: 0.5; stroke-dasharray: 4,4; }
+  .baseline { stroke: ${baselineColor}; stroke-width: 1; }
+  .char-label { font-family: sans-serif; font-size: ${cellSize * 0.06}px; fill: #aaa; }
+  .ref-char { font-family: sans-serif; font-size: ${cellSize * 0.7}px; fill: ${textColor}; text-anchor: middle; dominant-baseline: alphabetic; }
+</style>
+<rect width="100%" height="100%" fill="white"/>
+`;
+
+    for (let i = 0; i < chars.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = col * cellSize;
+      const y = row * cellSize;
+      const { char, unicode } = chars[i];
+      const uLabel = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')}`;
+      // Cell coordinate system: top of cell = ascender, bottom extends to descender
+      // Baseline is at y + (ascender / fontH) * cellSize from top
+      const baseY = y + (ascender / fontH) * cellSize;
+      const ascY = y;
+      const descY = y + cellSize;
+      const capY = y + ((ascender - capHeight) / fontH) * cellSize;
+      const xhY = y + ((ascender - xHeight) / fontH) * cellSize;
+
+      // Cell border
+      svg += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" class="cell-border"/>
+`;
+      // Guide lines
+      svg += `<line x1="${x}" y1="${capY}" x2="${x + cellSize}" y2="${capY}" class="guide"/>
+`;
+      svg += `<line x1="${x}" y1="${xhY}" x2="${x + cellSize}" y2="${xhY}" class="guide"/>
+`;
+      // Baseline (solid)
+      svg += `<line x1="${x}" y1="${baseY}" x2="${x + cellSize}" y2="${baseY}" class="baseline"/>
+`;
+      // Unicode label top-left
+      svg += `<text x="${x + 4}" y="${y + cellSize * 0.08}" class="char-label">${uLabel}</text>
+`;
+      // Character label top-right
+      const displayChar = char === ' ' ? 'Space' : char.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      svg += `<text x="${x + cellSize - 4}" y="${y + cellSize * 0.08}" class="char-label" text-anchor="end">${displayChar}</text>
+`;
+      // Reference character (light, as guide)
+      svg += `<text x="${x + cellSize / 2}" y="${baseY}" class="ref-char">${displayChar}</text>
+`;
+      // Placeholder group for user drawing - marked with data attribute
+      svg += `<g id="glyph-${uLabel}" data-unicode="${unicode}" data-char="${displayChar}">
+</g>
+`;
+    }
+
+    svg += `</svg>`;
+
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${this.project.name || 'MyFont'}_template.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this._notify('テンプレートをダウンロードしました。文字を描いてから「テンプレ取込」で読み込んでください。');
+  },
+
+  _importTemplate(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const svgText = e.target.result;
+        // Parse template metadata
+        const metaMatch = svgText.match(/FONT_TEMPLATE\s+cols="(\d+)"\s+cellSize="(\d+)"\s+upm="(\d+)"\s+ascender="(-?\d+)"\s+descender="(-?\d+)"\s+capHeight="(\d+)"\s+xHeight="(\d+)"/);
+        if (!metaMatch) {
+          this._notify('テンプレートのメタデータが見つかりません。テンプレートボタンでダウンロードしたSVGを使ってください。', 'error');
+          return;
+        }
+        const cols = parseInt(metaMatch[1]);
+        const cellSize = parseInt(metaMatch[2]);
+        const tUpm = parseInt(metaMatch[3]);
+        const tAscender = parseInt(metaMatch[4]);
+        const tDescender = parseInt(metaMatch[5]);
+        const tFontH = tAscender - tDescender;
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, 'image/svg+xml');
+
+        // Build char list in same order as template generation
+        const chars = [];
+        for (const g of CHAR_GROUPS) {
+          for (const ch of g.chars) {
+            chars.push({ char: ch, unicode: ch.codePointAt(0) });
+          }
+        }
+
+        let importCount = 0;
+        // Find all path/shape elements that are NOT part of the template itself
+        // Strategy: look at each cell area for paths that aren't template guides
+        for (let i = 0; i < chars.length; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const cellX = col * cellSize;
+          const cellY = row * cellSize;
+          const { char, unicode } = chars[i];
+          const uLabel = `U+${unicode.toString(16).toUpperCase().padStart(4, '0')}`;
+
+          // Look for the glyph group or any paths in this cell area
+          const glyphGroup = doc.getElementById(`glyph-${uLabel}`);
+          let pathEls = [];
+          if (glyphGroup) {
+            pathEls = glyphGroup.querySelectorAll('path, rect, circle, ellipse, polygon, polyline');
+          }
+
+          // Also find any free-floating paths within this cell's bounding box
+          if (pathEls.length === 0) {
+            const allPaths = doc.querySelectorAll('path, polygon, polyline');
+            for (const p of allPaths) {
+              // Skip template elements (those with class)
+              if (p.getAttribute('class')) continue;
+              if (p.closest('style') || p.closest('defs')) continue;
+              const d = p.getAttribute('d') || p.getAttribute('points');
+              if (!d) continue;
+              let cmds;
+              if (p.tagName === 'path') {
+                cmds = parseSVGPath(d);
+              } else {
+                continue;
+              }
+              if (!cmds.length) continue;
+              const b = getCmdsBounds(cmds);
+              // Check if this path's center falls within this cell
+              const cx = b.x + b.w / 2;
+              const cy = b.y + b.h / 2;
+              if (cx >= cellX && cx < cellX + cellSize && cy >= cellY && cy < cellY + cellSize) {
+                pathEls = [p];
+                break;
+              }
+            }
+          }
+
+          if (pathEls.length === 0) continue;
+
+          // Extract and transform paths from cell space to font space
+          let allCmds = [];
+          for (const p of pathEls) {
+            let cmds = [];
+            const localMatrix = getElementMatrix(p);
+            if (p.tagName === 'path') {
+              const d = p.getAttribute('d');
+              if (d) cmds = parseSVGPath(d);
+            } else if (p.tagName === 'rect') {
+              const rx = parseFloat(p.getAttribute('x') || 0), ry = parseFloat(p.getAttribute('y') || 0);
+              const rw = parseFloat(p.getAttribute('width') || 0), rh = parseFloat(p.getAttribute('height') || 0);
+              cmds = [{ type: 'M', x: rx, y: ry }, { type: 'L', x: rx + rw, y: ry }, { type: 'L', x: rx + rw, y: ry + rh }, { type: 'L', x: rx, y: ry + rh }, { type: 'Z' }];
+            } else if (p.tagName === 'circle') {
+              const ccx = parseFloat(p.getAttribute('cx') || 0), ccy = parseFloat(p.getAttribute('cy') || 0), r = parseFloat(p.getAttribute('r') || 0);
+              cmds = parseSVGPath(`M ${ccx - r} ${ccy} A ${r} ${r} 0 0 1 ${ccx + r} ${ccy} A ${r} ${r} 0 0 1 ${ccx - r} ${ccy} Z`);
+            } else if (p.tagName === 'ellipse') {
+              const ccx = parseFloat(p.getAttribute('cx') || 0), ccy = parseFloat(p.getAttribute('cy') || 0);
+              const erx = parseFloat(p.getAttribute('rx') || 0), ery = parseFloat(p.getAttribute('ry') || 0);
+              cmds = parseSVGPath(`M ${ccx - erx} ${ccy} A ${erx} ${ery} 0 0 1 ${ccx + erx} ${ccy} A ${erx} ${ery} 0 0 1 ${ccx - erx} ${ccy} Z`);
+            }
+            if (localMatrix) cmds = applyMatrix(cmds, localMatrix);
+            if (cmds.length) allCmds = allCmds.concat(cmds);
+          }
+
+          if (!allCmds.length) continue;
+
+          // Transform from cell SVG coordinates to font coordinates
+          // Cell: x in [cellX, cellX+cellSize], y: top=ascender, baseline at cellY + (ascender/fontH)*cellSize
+          const baseY = cellY + (tAscender / tFontH) * cellSize;
+          const scale = tFontH / cellSize; // cell pixels to font units
+          const lsb = this.project.defaultLsb || 50;
+
+          const fitted = allCmds.map(c => {
+            const pt = (px, py) => ({
+              x: (px - cellX) * scale + lsb - (tAscender - tAscender), // simplified: just offset from cell left
+              y: tAscender - (py - cellY) * scale, // flip Y: SVG top → font ascender
+            });
+            if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, ...p }; }
+            if (c.type === 'C') {
+              const p1 = pt(c.cp1x, c.cp1y), p2 = pt(c.cp2x, c.cp2y), p = pt(c.x, c.y);
+              return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y };
+            }
+            return { ...c };
+          });
+
+          const fittedB = getCmdsBounds(fitted);
+          // Center horizontally with lsb
+          const dx = lsb - fittedB.x;
+          const centeredCmds = transformCmds(fitted, dx, 0, 1, 1);
+          const finalB = getCmdsBounds(centeredCmds);
+          const rsb = this.project.defaultRsb || 50;
+          const aw = Math.round(finalB.x + finalB.w + rsb);
+
+          this.project.glyphs[unicode] = {
+            unicode,
+            char,
+            advanceWidth: aw,
+            lsb: lsb,
+            rsb: rsb,
+            pathData: centeredCmds,
+          };
+          importCount++;
+        }
+
+        this._refreshGlyphGrid();
+        if (this.currentUnicode != null && this.project.glyphs[this.currentUnicode]) {
+          this.editor.loadGlyph(this.project.glyphs[this.currentUnicode]);
+          document.getElementById('advance-width').value = this.project.glyphs[this.currentUnicode].advanceWidth;
+        }
+        this._updateBearingDisplay();
+
+        if (importCount > 0) {
+          this._notify(`テンプレートから${importCount}文字をインポートしました`);
+        } else {
+          this._notify('テンプレート内にパスが見つかりませんでした。文字を描いてから再アップロードしてください。', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        this._notify('テンプレートの読み込みに失敗しました: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
   },
 };
 

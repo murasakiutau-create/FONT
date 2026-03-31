@@ -51,7 +51,7 @@ class GlyphEditor {
     this.svg.appendChild(this.mainGroup);
 
     // Reference layer (inside main group = font coords)
-    this.refLayer = this._el('g', { id: 'ref-layer', opacity: '0.13' });
+    this.refLayer = this._el('g', { id: 'ref-layer', opacity: '0.35' });
     this.mainGroup.appendChild(this.refLayer);
 
     // Glyph paths layer
@@ -216,7 +216,7 @@ class GlyphEditor {
     // font-size = UPM so the reference glyph matches the em-square exactly
     text.setAttribute('font-size', upm || fontH);
     text.setAttribute('font-family', this.referenceFont);
-    text.setAttribute('fill', '#cccccc');
+    text.setAttribute('fill', '#888888');
     text.textContent = this.glyph.char;
     g.appendChild(text);
     this.refLayer.appendChild(g);
