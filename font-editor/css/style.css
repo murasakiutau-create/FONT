@@ -201,19 +201,20 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ─── Right Panel ────────────────────────────────────────────────────────── */
 #right-panel {
-  width: 240px; flex-shrink: 0;
+  width: 260px; flex-shrink: 0;
   background: var(--bg2); border-left: 1px solid var(--border);
   display: flex; flex-direction: column; overflow: hidden;
 }
 .rtab-bar {
-  display: flex; flex-shrink: 0;
+  display: flex; flex-shrink: 0; flex-wrap: wrap;
   border-bottom: 1px solid var(--border); background: var(--bg2);
 }
 .rtab-btn {
   flex: 1; background: transparent; color: var(--text3); border: none;
-  border-bottom: 2px solid transparent; padding: 7px 4px;
-  cursor: pointer; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; transition: all 0.12s; white-space: nowrap;
+  border-bottom: 2px solid transparent; padding: 7px 2px;
+  cursor: pointer; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.3px; transition: all 0.12s; white-space: nowrap;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
 .rtab-btn:hover { color: var(--text); }
 .rtab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
@@ -345,6 +346,47 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ─── File inputs hidden ────────────────────────────────────────────────── */
 input[type=file].hidden-input { display: none; }
+
+/* ─── Scale tab accent button ──────────────────────────────────────────── */
+.accent-btn {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+  text-align: center !important;
+  justify-content: center !important;
+}
+.accent-btn:hover { filter: brightness(1.15); }
+
+/* ─── Kerning ──────────────────────────────────────────────────────────── */
+.kern-pair-row {
+  display: flex; gap: 6px; margin-bottom: 4px;
+}
+.kern-char-box {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  padding: 6px 4px;
+}
+.kern-char {
+  font-size: 28px; font-weight: bold; color: var(--text);
+  min-height: 36px; display: flex; align-items: center; justify-content: center;
+}
+.kern-set-btn {
+  font-size: 9px !important; padding: 2px 6px !important; margin-bottom: 0 !important;
+  text-align: center !important; justify-content: center !important;
+}
+.kern-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+}
+.kern-table th {
+  background: var(--bg3); color: var(--text2); padding: 3px 6px;
+  text-align: left; font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.5px; border-bottom: 1px solid var(--border);
+}
+.kern-table td {
+  padding: 3px 6px; border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.kern-table tr:hover td { background: var(--bg4); }
 
 /* ─── Responsive adjustments ────────────────────────────────────────────── */
 @media (max-width: 900px) {

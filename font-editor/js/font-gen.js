@@ -79,6 +79,29 @@ function generateAndDownloadFont(project, format = 'ttf') {
     glyphs,
   });
 
+  // Add kerning pairs if available
+  if (project.kerning && Object.keys(project.kerning).length > 0) {
+    try {
+      const kernPairs = {};
+      for (const [key, value] of Object.entries(project.kerning)) {
+        const [u1, u2] = key.split(',').map(Number);
+        const g1Name = `uni${u1.toString(16).toUpperCase().padStart(4, '0')}`;
+        const g2Name = `uni${u2.toString(16).toUpperCase().padStart(4, '0')}`;
+        if (!kernPairs[g1Name]) kernPairs[g1Name] = {};
+        kernPairs[g1Name][g2Name] = value;
+      }
+      if (font.kerningPairs) {
+        for (const [left, rights] of Object.entries(kernPairs)) {
+          for (const [right, val] of Object.entries(rights)) {
+            const lg = font.charToGlyphIndex ? font.charToGlyphIndex(parseInt(left.replace('uni', ''), 16)) : null;
+            const rg = font.charToGlyphIndex ? font.charToGlyphIndex(parseInt(right.replace('uni', ''), 16)) : null;
+            if (lg && rg) font.kerningPairs[lg + ',' + rg] = val;
+          }
+        }
+      }
+    } catch (e) { console.warn('Kerning export warning:', e); }
+  }
+
   font.download(`${project.name || 'MyFont'}.${format}`);
   return font;
 }

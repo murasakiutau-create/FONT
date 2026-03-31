@@ -146,10 +146,11 @@
         <div class="preview-controls">
           <div class="preview-field">
             <label>プレビューテキスト</label>
-            <textarea id="preview-text" rows="3">The quick brown fox
+            <textarea id="preview-text" rows="5">The quick brown fox
 ABCDEFGHIJKLMNOPQRSTUVWXYZ
 abcdefghijklmnopqrstuvwxyz
-0123456789 !@#$%</textarea>
+0123456789 !@#$%
+あいうえお かきくけこ アイウエオ カキクケコ</textarea>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <div class="preview-field">
@@ -181,7 +182,10 @@ abcdefghijklmnopqrstuvwxyz
       <div class="rtab-bar">
         <button class="rtab-btn active" data-tab="transform">変形</button>
         <button class="rtab-btn" data-tab="nodes">ノード</button>
-        <button class="rtab-btn" data-tab="pathtools">パスツール</button>
+        <button class="rtab-btn" data-tab="scale">拡縮</button>
+        <button class="rtab-btn" data-tab="bearing">ベアリング</button>
+        <button class="rtab-btn" data-tab="kerning">カーニング</button>
+        <button class="rtab-btn" data-tab="pathtools">パス</button>
         <button class="rtab-btn" data-tab="view">表示</button>
       </div>
 
@@ -258,6 +262,96 @@ abcdefghijklmnopqrstuvwxyz
               <input type="number" id="h2y" class="num-input" step="0.5">
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ── Scale Tab ── -->
+      <div id="rtab-scale" class="rtab-content">
+        <div class="section-hdr">SVG拡大縮小</div>
+        <div class="slider-row">
+          <label>倍率</label>
+          <input type="range" id="scale-slider" min="10" max="500" step="1" value="100">
+          <span class="slider-val" id="scale-slider-val">100%</span>
+        </div>
+        <button class="panel-btn" id="scale-apply">スケール適用</button>
+
+        <div class="section-hdr">ベースラインフィット</div>
+        <p style="font-size:10px;color:var(--text2);margin-bottom:6px">お手本に合わせて自動的にサイズ・位置を調整します。日本語（ひらがな・カタカナ）にも対応しています。</p>
+        <button class="panel-btn accent-btn" id="fit-baseline-btn">ベースラインに合わせる</button>
+      </div>
+
+      <!-- ── Bearing Tab ── -->
+      <div id="rtab-bearing" class="rtab-content">
+        <div class="section-hdr">個別サイドベアリング</div>
+        <div class="input-row">
+          <label>L</label>
+          <input type="number" id="bearing-lsb" class="num-input" value="0" step="1">
+        </div>
+        <div class="input-row">
+          <label>R</label>
+          <input type="number" id="bearing-rsb" class="num-input" value="0" step="1">
+        </div>
+
+        <div class="section-hdr">一括設定</div>
+        <div class="input-row">
+          <label>L</label>
+          <input type="number" id="batch-lsb" class="num-input" value="50" step="1">
+        </div>
+        <div class="input-row">
+          <label>R</label>
+          <input type="number" id="batch-rsb" class="num-input" value="50" step="1">
+        </div>
+        <button class="panel-btn" id="batch-bearing-apply">全グリフに適用</button>
+
+        <div class="section-hdr">自動ベアリング</div>
+        <p style="font-size:10px;color:var(--text2);margin-bottom:6px">しきい値をスライダーで調整するとリアルタイムで反映されます。</p>
+        <div class="slider-row">
+          <label>しきい値</label>
+          <input type="range" id="auto-bearing-threshold" min="1" max="30" step="1" value="10">
+          <span class="slider-val" id="auto-bearing-val">10%</span>
+        </div>
+        <button class="panel-btn" id="auto-bearing-apply">自動ベアリング適用</button>
+      </div>
+
+      <!-- ── Kerning Tab ── -->
+      <div id="rtab-kerning" class="rtab-content">
+        <div class="section-hdr">手動カーニング</div>
+        <div class="kern-pair-row">
+          <div class="kern-char-box">
+            <span id="kern-left-char" class="kern-char">-</span>
+            <button class="panel-btn kern-set-btn" id="kern-set-left">左に設定</button>
+          </div>
+          <div class="kern-char-box">
+            <span id="kern-right-char" class="kern-char">-</span>
+            <button class="panel-btn kern-set-btn" id="kern-set-right">右に設定</button>
+          </div>
+        </div>
+        <div class="input-row" style="margin-top:6px">
+          <label>値</label>
+          <input type="number" id="kern-value" class="num-input" value="0" step="1">
+        </div>
+        <div class="slider-row">
+          <label>調整</label>
+          <input type="range" id="kern-value-slider" min="-200" max="200" step="1" value="0">
+        </div>
+        <div id="kern-preview" style="min-height:40px;background:var(--bg);border-radius:4px;padding:8px;margin:6px 0;text-align:center;color:var(--text)"></div>
+
+        <div class="section-hdr">自動カーニング</div>
+        <div class="slider-row">
+          <label>しきい値</label>
+          <input type="range" id="auto-kern-threshold" min="1" max="20" step="1" value="5">
+          <span class="slider-val" id="auto-kern-val">5%</span>
+        </div>
+        <button class="panel-btn" id="auto-kern-btn">自動カーニング実行</button>
+        <button class="panel-btn" id="clear-kern-btn" style="margin-top:3px">カーニングをクリア</button>
+
+        <div class="section-hdr">カーニングテーブル</div>
+        <button class="panel-btn" id="show-kern-table">テーブル表示/非表示</button>
+        <div id="kern-table-wrap" style="display:none;margin-top:6px;max-height:200px;overflow-y:auto">
+          <table class="kern-table">
+            <thead><tr><th>左</th><th>右</th><th>値</th></tr></thead>
+            <tbody id="kern-table-body"></tbody>
+          </table>
         </div>
       </div>
 

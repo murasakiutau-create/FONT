@@ -11,6 +11,13 @@ const CHAR_GROUPS = [
   { label: '0 – 9', chars: '0123456789' },
   { label: 'Symbols', chars: '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~' },
   { label: 'Space', chars: ' ' },
+  { label: 'ひらがな', chars: 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん' },
+  { label: 'ひらがな濁音', chars: 'がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ' },
+  { label: 'ひらがな小文字', chars: 'ぁぃぅぇぉっゃゅょゎ' },
+  { label: 'カタカナ', chars: 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン' },
+  { label: 'カタカナ濁音', chars: 'ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ' },
+  { label: 'カタカナ小文字', chars: 'ァィゥェォッャュョヮヴ' },
+  { label: 'カタカナ記号', chars: 'ーヽヾ' },
 ];
 
 const ALL_CHARS = [];
@@ -34,10 +41,12 @@ const App = {
     defaultLsb: 50,
     defaultRsb: 50,
     glyphs: {}, // unicode -> glyph object
+    kerning: {}, // "u1,u2" -> value (kern pair)
   },
   editor: null,
   currentUnicode: null,
   activeRightTab: 'transform',
+  kernPair: { left: null, right: null },
   previewFontFamily: null,
   previewFontKey: 0,
   undoStack: [],
@@ -168,6 +177,7 @@ const App = {
     this.editor.loadGlyph(glyph);
     this._refreshGlyphGrid();
     this._refreshNavButtons();
+    this._updateBearingDisplay();
   },
 
   _saveCurrentGlyph() {
@@ -568,6 +578,90 @@ const App = {
       this._notify('パスの向きを逆にしました');
     });
 
+    // ── SVG Scaling ──
+    document.getElementById('scale-slider')?.addEventListener('input', e => {
+      document.getElementById('scale-slider-val').textContent = e.target.value + '%';
+    });
+    document.getElementById('scale-apply')?.addEventListener('click', () => {
+      const pct = parseFloat(document.getElementById('scale-slider')?.value) || 100;
+      this._applyScale(pct);
+      document.getElementById('scale-slider').value = 100;
+      document.getElementById('scale-slider-val').textContent = '100%';
+      this._notify(`${pct}%にスケールしました`);
+    });
+    document.getElementById('fit-baseline-btn')?.addEventListener('click', () => {
+      this._fitToBaseline();
+    });
+
+    // ── Side Bearings ──
+    document.getElementById('bearing-lsb')?.addEventListener('change', e => {
+      this._setLSB(parseInt(e.target.value) || 0);
+    });
+    document.getElementById('bearing-rsb')?.addEventListener('change', e => {
+      this._setRSB(parseInt(e.target.value) || 0);
+    });
+    document.getElementById('batch-bearing-apply')?.addEventListener('click', () => {
+      const lsb = parseInt(document.getElementById('batch-lsb')?.value) || 50;
+      const rsb = parseInt(document.getElementById('batch-rsb')?.value) || 50;
+      this._batchSetBearings(lsb, rsb);
+    });
+    document.getElementById('auto-bearing-threshold')?.addEventListener('input', e => {
+      document.getElementById('auto-bearing-val').textContent = e.target.value + '%';
+    });
+    document.getElementById('auto-bearing-apply')?.addEventListener('click', () => {
+      const threshold = parseFloat(document.getElementById('auto-bearing-threshold')?.value) || 10;
+      this._autoSetBearings(threshold);
+    });
+    // Real-time bearing preview with slider
+    document.getElementById('auto-bearing-threshold')?.addEventListener('input', e => {
+      document.getElementById('auto-bearing-val').textContent = e.target.value + '%';
+      // Debounced auto-apply for real-time preview
+      clearTimeout(this._bearingDebounce);
+      this._bearingDebounce = setTimeout(() => {
+        const threshold = parseFloat(e.target.value) || 10;
+        this._autoSetBearings(threshold);
+      }, 150);
+    });
+
+    // ── Kerning ──
+    document.getElementById('kern-set-left')?.addEventListener('click', () => {
+      this.kernPair.left = this.currentUnicode;
+      this._updateKernDisplay();
+      this._renderKernPreview();
+    });
+    document.getElementById('kern-set-right')?.addEventListener('click', () => {
+      this.kernPair.right = this.currentUnicode;
+      this._updateKernDisplay();
+      this._renderKernPreview();
+    });
+    document.getElementById('kern-value')?.addEventListener('change', e => {
+      this._setKernValue(parseInt(e.target.value) || 0);
+    });
+    document.getElementById('kern-value-slider')?.addEventListener('input', e => {
+      document.getElementById('kern-value').value = e.target.value;
+      this._setKernValue(parseInt(e.target.value) || 0);
+    });
+    document.getElementById('kern-value')?.addEventListener('input', e => {
+      const slider = document.getElementById('kern-value-slider');
+      if (slider) slider.value = e.target.value;
+    });
+    document.getElementById('auto-kern-btn')?.addEventListener('click', () => {
+      this._autoKern();
+      this._renderKernTable();
+    });
+    document.getElementById('auto-kern-threshold')?.addEventListener('input', e => {
+      document.getElementById('auto-kern-val').textContent = e.target.value + '%';
+    });
+    document.getElementById('clear-kern-btn')?.addEventListener('click', () => {
+      this._clearAllKerning();
+      this._renderKernTable();
+    });
+    document.getElementById('show-kern-table')?.addEventListener('click', () => {
+      this._renderKernTable();
+      const table = document.getElementById('kern-table-wrap');
+      if (table) table.style.display = table.style.display === 'none' ? 'block' : 'none';
+    });
+
     // ── Reference font ──
     document.getElementById('ref-font-select')?.addEventListener('change', e => {
       this.editor.setReferenceFont(e.target.value);
@@ -798,6 +892,347 @@ const App = {
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
+  },
+
+  // ─── SVG Scaling ──────────────────────────────────────────────────────────────
+
+  _applyScale(percent) {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    const s = percent / 100;
+    const b = getCmdsBounds(this.editor.glyph.pathData);
+    if (b.w === 0 || b.h === 0) return;
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    let cmds = transformCmds(this.editor.glyph.pathData, -cx, -cy, 1, 1);
+    cmds = transformCmds(cmds, 0, 0, s, s);
+    cmds = transformCmds(cmds, cx, cy, 1, 1);
+    this.editor.glyph.pathData = cmds;
+    this.editor.render();
+    this.editor._notifyBBox();
+    this.editor._notifyChange();
+  },
+
+  _fitToBaseline() {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    const cmds = this.editor.glyph.pathData;
+    const b = getCmdsBounds(cmds);
+    if (b.w === 0 || b.h === 0) return;
+    const { ascender, descender } = this.project;
+    const char = this.editor.glyph.char || '';
+    const cp = char.codePointAt(0) || 0;
+    const isJapanese = (cp >= 0x3040 && cp <= 0x309F) || (cp >= 0x30A0 && cp <= 0x30FF) ||
+                       (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0xFF00 && cp <= 0xFFEF);
+    const isUpper = /^[A-Z]$/.test(char);
+    const isLower = /^[a-z]$/.test(char);
+    const isDigit = /^[0-9]$/.test(char);
+
+    let targetTop, targetBottom, targetWidth;
+    const upm = this.project.upm || 1000;
+    const lsb = this.project.defaultLsb || 50;
+    const rsb = this.project.defaultRsb || 50;
+
+    if (isJapanese) {
+      // Japanese: fill 90% of em-square, centered
+      const japanSize = upm * 0.88;
+      targetTop = ascender - (upm - japanSize) / 2;
+      targetBottom = targetTop - japanSize;
+      targetWidth = japanSize;
+    } else if (isUpper) {
+      targetTop = this.project.capHeight || 700;
+      targetBottom = 0;
+      targetWidth = null;
+    } else if (isLower) {
+      targetTop = this.project.xHeight || 500;
+      targetBottom = 0;
+      targetWidth = null;
+    } else if (isDigit) {
+      targetTop = this.project.capHeight || 700;
+      targetBottom = 0;
+      targetWidth = null;
+    } else {
+      targetTop = this.project.capHeight || 700;
+      targetBottom = 0;
+      targetWidth = null;
+    }
+
+    const targetH = targetTop - targetBottom;
+    const scaleY = targetH / b.h;
+    const scaleX = targetWidth ? (targetWidth / b.w) : scaleY;
+    const finalScale = Math.min(scaleX, scaleY);
+
+    // Scale from center
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    let newCmds = transformCmds(cmds, -cx, -cy, 1, 1);
+    newCmds = transformCmds(newCmds, 0, 0, finalScale, finalScale);
+    const newB = getCmdsBounds(newCmds);
+
+    // Position: center horizontally with LSB, align bottom to targetBottom
+    let offsetX, offsetY;
+    if (isJapanese) {
+      offsetX = (upm - newB.w) / 2 - newB.x;
+      offsetY = targetTop - newB.y - newB.h;
+    } else {
+      offsetX = lsb - newB.x;
+      offsetY = targetBottom - newB.y;
+    }
+    newCmds = transformCmds(newCmds, offsetX, offsetY, 1, 1);
+
+    const finalB = getCmdsBounds(newCmds);
+    const aw = isJapanese ? upm : Math.round(finalB.x + finalB.w + rsb);
+
+    this.editor.glyph.pathData = newCmds;
+    this.editor.glyph.advanceWidth = aw;
+    document.getElementById('advance-width').value = aw;
+    this.editor.render();
+    this.editor._notifyBBox();
+    this.editor._notifyChange();
+    this._notify('ベースラインに合わせました');
+  },
+
+  // ─── Side Bearings ────────────────────────────────────────────────────────────
+
+  _updateBearingDisplay() {
+    if (!this.editor || !this.editor.glyph) return;
+    const g = this.editor.glyph;
+    const b = getCmdsBounds(g.pathData);
+    const lsb = b.w > 0 ? Math.round(b.x) : (g.lsb || 0);
+    const rsb = b.w > 0 ? Math.round(g.advanceWidth - b.x - b.w) : (g.rsb || 0);
+    const lsbEl = document.getElementById('bearing-lsb');
+    const rsbEl = document.getElementById('bearing-rsb');
+    if (lsbEl && document.activeElement !== lsbEl) lsbEl.value = lsb;
+    if (rsbEl && document.activeElement !== rsbEl) rsbEl.value = rsb;
+  },
+
+  _setLSB(value) {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    const b = getCmdsBounds(this.editor.glyph.pathData);
+    if (b.w === 0) return;
+    const dx = value - b.x;
+    this.editor.glyph.pathData = transformCmds(this.editor.glyph.pathData, dx, 0, 1, 1);
+    this.editor.glyph.lsb = value;
+    this.editor.render();
+    this.editor._notifyBBox();
+    this.editor._notifyChange();
+    this._updateBearingDisplay();
+  },
+
+  _setRSB(value) {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
+    const b = getCmdsBounds(this.editor.glyph.pathData);
+    if (b.w === 0) return;
+    const newAW = Math.round(b.x + b.w + value);
+    this.editor.glyph.advanceWidth = newAW;
+    this.editor.glyph.rsb = value;
+    document.getElementById('advance-width').value = newAW;
+    this.editor.setAdvanceWidth(newAW);
+    this.editor._notifyChange();
+    this._updateBearingDisplay();
+  },
+
+  _batchSetBearings(lsb, rsb) {
+    this._saveCurrentGlyph();
+    let count = 0;
+    for (const [uni, g] of Object.entries(this.project.glyphs)) {
+      if (!g.pathData || !g.pathData.length) continue;
+      const b = getCmdsBounds(g.pathData);
+      if (b.w === 0) continue;
+      // Adjust LSB
+      const dx = lsb - b.x;
+      g.pathData = transformCmds(g.pathData, dx, 0, 1, 1);
+      g.lsb = lsb;
+      // Adjust RSB
+      const newB = getCmdsBounds(g.pathData);
+      g.advanceWidth = Math.round(newB.x + newB.w + rsb);
+      g.rsb = rsb;
+      count++;
+    }
+    if (this.currentUnicode != null && this.project.glyphs[this.currentUnicode]) {
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode]);
+      document.getElementById('advance-width').value = this.project.glyphs[this.currentUnicode].advanceWidth;
+    }
+    this._updateBearingDisplay();
+    this._notify(`${count}グリフのベアリングを設定しました`);
+  },
+
+  _autoSetBearings(threshold) {
+    this._saveCurrentGlyph();
+    let count = 0;
+    const upm = this.project.upm || 1000;
+    for (const [uni, g] of Object.entries(this.project.glyphs)) {
+      if (!g.pathData || !g.pathData.length) continue;
+      const b = getCmdsBounds(g.pathData);
+      if (b.w === 0) continue;
+      const cp = parseInt(uni);
+      const isJapanese = (cp >= 0x3040 && cp <= 0x309F) || (cp >= 0x30A0 && cp <= 0x30FF) ||
+                         (cp >= 0x4E00 && cp <= 0x9FFF);
+      let lsb, rsb;
+      if (isJapanese) {
+        // Japanese: center in em-square
+        lsb = Math.round((upm - b.w) / 2);
+        rsb = lsb;
+      } else {
+        // Latin: proportional based on threshold
+        const ratio = threshold / 100;
+        const base = Math.round(b.w * ratio);
+        lsb = Math.max(0, Math.min(base, Math.round(upm * 0.15)));
+        rsb = lsb;
+      }
+      const dx = lsb - b.x;
+      g.pathData = transformCmds(g.pathData, dx, 0, 1, 1);
+      g.lsb = lsb;
+      const newB = getCmdsBounds(g.pathData);
+      g.advanceWidth = Math.round(newB.x + newB.w + rsb);
+      g.rsb = rsb;
+      count++;
+    }
+    if (this.currentUnicode != null && this.project.glyphs[this.currentUnicode]) {
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode]);
+      document.getElementById('advance-width').value = this.project.glyphs[this.currentUnicode].advanceWidth;
+    }
+    this._updateBearingDisplay();
+    this._notify(`${count}グリフの自動ベアリングを設定しました`);
+  },
+
+  // ─── Kerning ──────────────────────────────────────────────────────────────────
+
+  _updateKernDisplay() {
+    const lCharEl = document.getElementById('kern-left-char');
+    const rCharEl = document.getElementById('kern-right-char');
+    const valEl = document.getElementById('kern-value');
+    if (!lCharEl || !rCharEl || !valEl) return;
+    if (this.kernPair.left != null) {
+      lCharEl.textContent = String.fromCodePoint(this.kernPair.left);
+    } else {
+      lCharEl.textContent = '-';
+    }
+    if (this.kernPair.right != null) {
+      rCharEl.textContent = String.fromCodePoint(this.kernPair.right);
+    } else {
+      rCharEl.textContent = '-';
+    }
+    if (this.kernPair.left != null && this.kernPair.right != null) {
+      const key = `${this.kernPair.left},${this.kernPair.right}`;
+      valEl.value = this.project.kerning[key] || 0;
+    } else {
+      valEl.value = 0;
+    }
+  },
+
+  _setKernValue(val) {
+    if (this.kernPair.left == null || this.kernPair.right == null) return;
+    const key = `${this.kernPair.left},${this.kernPair.right}`;
+    if (val === 0) {
+      delete this.project.kerning[key];
+    } else {
+      this.project.kerning[key] = val;
+    }
+    this._renderKernPreview();
+  },
+
+  _renderKernPreview() {
+    const container = document.getElementById('kern-preview');
+    if (!container) return;
+    if (this.kernPair.left == null || this.kernPair.right == null) {
+      container.textContent = '';
+      return;
+    }
+    const lChar = String.fromCodePoint(this.kernPair.left);
+    const rChar = String.fromCodePoint(this.kernPair.right);
+    const key = `${this.kernPair.left},${this.kernPair.right}`;
+    const kv = this.project.kerning[key] || 0;
+    container.innerHTML = '';
+    const span = document.createElement('span');
+    span.style.fontFamily = this.previewFontFamily ? `'${this.previewFontFamily}', sans-serif` : 'sans-serif';
+    span.style.fontSize = '48px';
+    span.style.letterSpacing = kv + 'px';
+    span.textContent = lChar + rChar;
+    container.appendChild(span);
+    const info = document.createElement('div');
+    info.style.fontSize = '10px';
+    info.style.color = 'var(--text3)';
+    info.style.marginTop = '4px';
+    info.textContent = `カーニング値: ${kv}`;
+    container.appendChild(info);
+  },
+
+  _autoKern() {
+    this._saveCurrentGlyph();
+    const glyphs = this.project.glyphs;
+    const upm = this.project.upm || 1000;
+    const threshold = parseFloat(document.getElementById('auto-kern-threshold')?.value) || 5;
+    let count = 0;
+    const unicodes = Object.keys(glyphs).map(Number).filter(u => {
+      const g = glyphs[u];
+      return g && g.pathData && g.pathData.length > 0;
+    });
+
+    for (let i = 0; i < unicodes.length; i++) {
+      const u1 = unicodes[i];
+      const g1 = glyphs[u1];
+      const b1 = getCmdsBounds(g1.pathData);
+      if (b1.w === 0) continue;
+      const rightEdge1 = b1.x + b1.w;
+      const rsb1 = g1.advanceWidth - rightEdge1;
+
+      for (let j = 0; j < unicodes.length; j++) {
+        const u2 = unicodes[j];
+        const g2 = glyphs[u2];
+        const b2 = getCmdsBounds(g2.pathData);
+        if (b2.w === 0) continue;
+        const lsb2 = b2.x;
+        // Kern = reduce gap if gap is too wide, add if too tight
+        const gap = rsb1 + lsb2;
+        const ideal = upm * threshold / 100;
+        const kern = Math.round(ideal - gap);
+        if (Math.abs(kern) > 2) {
+          const key = `${u1},${u2}`;
+          this.project.kerning[key] = kern;
+          count++;
+        }
+      }
+    }
+    this._updateKernDisplay();
+    this._renderKernPreview();
+    this._notify(`${count}ペアの自動カーニングを設定しました`);
+  },
+
+  _clearAllKerning() {
+    this.project.kerning = {};
+    this._updateKernDisplay();
+    this._renderKernPreview();
+    this._notify('カーニングをすべてクリアしました');
+  },
+
+  _renderKernTable() {
+    const tbody = document.getElementById('kern-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const pairs = Object.entries(this.project.kerning);
+    if (!pairs.length) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="3" style="color:var(--text3);text-align:center;padding:8px">カーニングペアなし</td>';
+      tbody.appendChild(tr);
+      return;
+    }
+    // Show max 50 pairs
+    const shown = pairs.slice(0, 50);
+    for (const [key, val] of shown) {
+      const [u1, u2] = key.split(',').map(Number);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${String.fromCodePoint(u1)}</td><td>${String.fromCodePoint(u2)}</td><td>${val}</td>`;
+      tr.style.cursor = 'pointer';
+      tr.addEventListener('click', () => {
+        this.kernPair.left = u1;
+        this.kernPair.right = u2;
+        this._updateKernDisplay();
+        this._renderKernPreview();
+      });
+      tbody.appendChild(tr);
+    }
+    if (pairs.length > 50) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="3" style="color:var(--text3);text-align:center">…他 ${pairs.length - 50}ペア</td>`;
+      tbody.appendChild(tr);
+    }
   },
 };
 
