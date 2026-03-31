@@ -589,10 +589,6 @@ const App = {
       document.getElementById('scale-slider-val').textContent = '100%';
       this._notify(`${pct}%にスケールしました`);
     });
-    document.getElementById('fit-baseline-btn')?.addEventListener('click', () => {
-      this._fitToBaseline();
-    });
-
     // ── Side Bearings ──
     document.getElementById('bearing-lsb')?.addEventListener('change', e => {
       this._setLSB(parseInt(e.target.value) || 0);
@@ -909,83 +905,6 @@ const App = {
     this.editor.render();
     this.editor._notifyBBox();
     this.editor._notifyChange();
-  },
-
-  _fitToBaseline() {
-    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
-    const cmds = this.editor.glyph.pathData;
-    const b = getCmdsBounds(cmds);
-    if (b.w === 0 || b.h === 0) return;
-    const { ascender, descender } = this.project;
-    const char = this.editor.glyph.char || '';
-    const cp = char.codePointAt(0) || 0;
-    const isJapanese = (cp >= 0x3040 && cp <= 0x309F) || (cp >= 0x30A0 && cp <= 0x30FF) ||
-                       (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0xFF00 && cp <= 0xFFEF);
-    const isUpper = /^[A-Z]$/.test(char);
-    const isLower = /^[a-z]$/.test(char);
-    const isDigit = /^[0-9]$/.test(char);
-
-    let targetTop, targetBottom, targetWidth;
-    const upm = this.project.upm || 1000;
-    const lsb = this.project.defaultLsb || 50;
-    const rsb = this.project.defaultRsb || 50;
-
-    if (isJapanese) {
-      // Japanese: fill 90% of em-square, centered
-      const japanSize = upm * 0.88;
-      targetTop = ascender - (upm - japanSize) / 2;
-      targetBottom = targetTop - japanSize;
-      targetWidth = japanSize;
-    } else if (isUpper) {
-      targetTop = this.project.capHeight || 700;
-      targetBottom = 0;
-      targetWidth = null;
-    } else if (isLower) {
-      targetTop = this.project.xHeight || 500;
-      targetBottom = 0;
-      targetWidth = null;
-    } else if (isDigit) {
-      targetTop = this.project.capHeight || 700;
-      targetBottom = 0;
-      targetWidth = null;
-    } else {
-      targetTop = this.project.capHeight || 700;
-      targetBottom = 0;
-      targetWidth = null;
-    }
-
-    const targetH = targetTop - targetBottom;
-    const scaleY = targetH / b.h;
-    const scaleX = targetWidth ? (targetWidth / b.w) : scaleY;
-    const finalScale = Math.min(scaleX, scaleY);
-
-    // Scale from center
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    let newCmds = transformCmds(cmds, -cx, -cy, 1, 1);
-    newCmds = transformCmds(newCmds, 0, 0, finalScale, finalScale);
-    const newB = getCmdsBounds(newCmds);
-
-    // Position: center horizontally with LSB, align bottom to targetBottom
-    let offsetX, offsetY;
-    if (isJapanese) {
-      offsetX = (upm - newB.w) / 2 - newB.x;
-      offsetY = targetTop - newB.y - newB.h;
-    } else {
-      offsetX = lsb - newB.x;
-      offsetY = targetBottom - newB.y;
-    }
-    newCmds = transformCmds(newCmds, offsetX, offsetY, 1, 1);
-
-    const finalB = getCmdsBounds(newCmds);
-    const aw = isJapanese ? upm : Math.round(finalB.x + finalB.w + rsb);
-
-    this.editor.glyph.pathData = newCmds;
-    this.editor.glyph.advanceWidth = aw;
-    document.getElementById('advance-width').value = aw;
-    this.editor.render();
-    this.editor._notifyBBox();
-    this.editor._notifyChange();
-    this._notify('ベースラインに合わせました');
   },
 
   // ─── Side Bearings ────────────────────────────────────────────────────────────
