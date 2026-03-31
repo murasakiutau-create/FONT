@@ -66,6 +66,10 @@ class GlyphEditor {
     this.nodesLayer = this._el('g', { id: 'nodes-layer' });
     this.mainGroup.appendChild(this.nodesLayer);
 
+    // Resize handles layer (inside main group)
+    this.resizeLayer = this._el('g', { id: 'resize-layer' });
+    this.mainGroup.appendChild(this.resizeLayer);
+
     // Overlay (screen space — for grid guide labels)
     this.overlayLayer = this._el('g', { id: 'overlay-layer' });
     this.svg.appendChild(this.overlayLayer);
@@ -159,6 +163,7 @@ class GlyphEditor {
     this._renderPaths();
     this._renderNodes();
     this._renderAdvanceWidth();
+    this._renderResizeHandles();
   }
 
   _renderGrid() {
@@ -196,19 +201,20 @@ class GlyphEditor {
   _renderReference() {
     this.refLayer.innerHTML = '';
     if (!this.showReference || !this.glyph || !this.glyph.char) return;
-    const { ascender, descender } = this.options;
+    const { ascender, descender, upm } = this.options;
     const fontH = ascender - descender;
-    // Draw reference character as text element (will be flipped with group)
-    // We need to flip text back since the group already flips Y
-    const g = this._el('g', { transform: `translate(0, ${ascender}) scale(1,-1)` });
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     const aw = this.glyph.advanceWidth || 600;
+    // Render text directly in font coordinate space (Y-up in mainGroup).
+    // SVG <text> needs Y-down, so wrap in a group that flips Y around baseline (y=0).
+    // scale(1,-1) flips Y; text is then drawn in normal SVG orientation at y=0 = baseline.
+    const g = this._el('g', { transform: 'scale(1,-1)' });
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('x', aw / 2);
-    // y=ascender in sub-group maps to font y=0 (baseline)
-    text.setAttribute('y', ascender);
+    text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('dominant-baseline', 'alphabetic');
-    text.setAttribute('font-size', fontH);
+    // font-size = UPM so the reference glyph matches the em-square exactly
+    text.setAttribute('font-size', upm || fontH);
     text.setAttribute('font-family', this.referenceFont);
     text.setAttribute('fill', '#cccccc');
     text.textContent = this.glyph.char;
@@ -401,6 +407,44 @@ class GlyphEditor {
       this.glyph.pathData = transformCmds(JSON.parse(JSON.stringify(ds.origData)), dx, dy, 1, 1);
       this._renderPaths(); this._renderNodes(); this._notifyBBox(); this._notifyChange();
     }
+    if (ds.type === 'resize') {
+      const fp = this.screenToFont(sx, sy);
+      this._applyResize(ds, fp.x, fp.y);
+    }
+  }
+
+  _applyResize(ds, fx, fy) {
+    const ob = ds.origBBox;
+    const handle = ds.handle;
+    let newMinX = ob.x, newMinY = ob.y, newMaxX = ob.x + ob.w, newMaxY = ob.y + ob.h;
+
+    // Which edges move depends on handle
+    if (handle.includes('l')) newMinX = Math.min(fx, newMaxX - 1);
+    if (handle.includes('r')) newMaxX = Math.max(fx, newMinX + 1);
+    if (handle.includes('b')) newMinY = Math.min(fy, newMaxY - 1);
+    if (handle.includes('t')) newMaxY = Math.max(fy, newMinY + 1);
+
+    const newW = newMaxX - newMinX;
+    const newH = newMaxY - newMinY;
+    const sx = newW / ob.w;
+    const sy = newH / ob.h;
+
+    // Scale from original bbox origin, then translate to new position
+    const cmds = JSON.parse(JSON.stringify(ds.origData));
+    const scaled = cmds.map(c => {
+      const pt = (x, y) => ({
+        x: (x - ob.x) * sx + newMinX,
+        y: (y - ob.y) * sy + newMinY,
+      });
+      if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, x: p.x, y: p.y }; }
+      if (c.type === 'C') {
+        const p1 = pt(c.cp1x, c.cp1y), p2 = pt(c.cp2x, c.cp2y), p = pt(c.x, c.y);
+        return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y };
+      }
+      return { ...c };
+    });
+    this.glyph.pathData = scaled;
+    this._renderPaths(); this._renderNodes(); this._renderResizeHandles(); this._notifyBBox(); this._notifyChange();
   }
 
   _onMouseup(e) {
@@ -422,6 +466,64 @@ class GlyphEditor {
 
   _onDblclick(e) {
     // Future: add node on double-click on path
+  }
+
+  // ─── Resize Handles ──────────────────────────────────────────────────────────
+
+  _renderResizeHandles() {
+    this.resizeLayer.innerHTML = '';
+    if (this.editMode !== 'select' || !this.glyph || !this.glyph.pathData || !this.glyph.pathData.length) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    if (b.w === 0 && b.h === 0) return;
+
+    const sw = 1 / this.zoom;
+    const hSize = 6 / this.zoom;
+
+    // Bounding box outline
+    const rect = this._el('rect', {
+      x: b.x, y: b.y, width: b.w, height: b.h,
+      fill: 'none', stroke: '#000', 'stroke-width': sw,
+      'stroke-dasharray': `${4 / this.zoom},${3 / this.zoom}`,
+      'pointer-events': 'none', opacity: '0.5',
+    });
+    this.resizeLayer.appendChild(rect);
+
+    // 8 handles: corners + midpoints
+    const handles = [
+      { id: 'tl', x: b.x,            y: b.y + b.h,      cursor: 'nwse-resize' },
+      { id: 'tr', x: b.x + b.w,      y: b.y + b.h,      cursor: 'nesw-resize' },
+      { id: 'bl', x: b.x,            y: b.y,             cursor: 'nesw-resize' },
+      { id: 'br', x: b.x + b.w,      y: b.y,             cursor: 'nwse-resize' },
+      { id: 't',  x: b.x + b.w / 2,  y: b.y + b.h,      cursor: 'ns-resize' },
+      { id: 'b',  x: b.x + b.w / 2,  y: b.y,             cursor: 'ns-resize' },
+      { id: 'l',  x: b.x,            y: b.y + b.h / 2,   cursor: 'ew-resize' },
+      { id: 'r',  x: b.x + b.w,      y: b.y + b.h / 2,   cursor: 'ew-resize' },
+    ];
+
+    for (const h of handles) {
+      const el = this._el('rect', {
+        x: h.x - hSize / 2, y: h.y - hSize / 2,
+        width: hSize, height: hSize,
+        fill: '#fff', stroke: '#000', 'stroke-width': sw,
+        cursor: h.cursor, 'data-handle': h.id,
+      });
+      el.addEventListener('mousedown', e => this._handleResizeMousedown(e, h.id));
+      this.resizeLayer.appendChild(el);
+    }
+  }
+
+  _handleResizeMousedown(e, handleId) {
+    e.stopPropagation();
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    const { sx, sy } = this._getEventPos(e);
+    const b = getCmdsBounds(this.glyph.pathData);
+    this.dragState = {
+      type: 'resize',
+      handle: handleId,
+      startSx: sx, startSy: sy,
+      origBBox: { ...b },
+      origData: JSON.parse(JSON.stringify(this.glyph.pathData)),
+    };
   }
 
   // ─── Transform operations ─────────────────────────────────────────────────

@@ -578,17 +578,6 @@ const App = {
       this._notify('パスの向きを逆にしました');
     });
 
-    // ── SVG Scaling ──
-    document.getElementById('scale-slider')?.addEventListener('input', e => {
-      document.getElementById('scale-slider-val').textContent = e.target.value + '%';
-    });
-    document.getElementById('scale-apply')?.addEventListener('click', () => {
-      const pct = parseFloat(document.getElementById('scale-slider')?.value) || 100;
-      this._applyScale(pct);
-      document.getElementById('scale-slider').value = 100;
-      document.getElementById('scale-slider-val').textContent = '100%';
-      this._notify(`${pct}%にスケールしました`);
-    });
     // ── Side Bearings ──
     document.getElementById('bearing-lsb')?.addEventListener('change', e => {
       this._setLSB(parseInt(e.target.value) || 0);
@@ -888,23 +877,6 @@ const App = {
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
-  },
-
-  // ─── SVG Scaling ──────────────────────────────────────────────────────────────
-
-  _applyScale(percent) {
-    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) return;
-    const s = percent / 100;
-    const b = getCmdsBounds(this.editor.glyph.pathData);
-    if (b.w === 0 || b.h === 0) return;
-    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    let cmds = transformCmds(this.editor.glyph.pathData, -cx, -cy, 1, 1);
-    cmds = transformCmds(cmds, 0, 0, s, s);
-    cmds = transformCmds(cmds, cx, cy, 1, 1);
-    this.editor.glyph.pathData = cmds;
-    this.editor.render();
-    this.editor._notifyBBox();
-    this.editor._notifyChange();
   },
 
   // ─── Side Bearings ────────────────────────────────────────────────────────────
