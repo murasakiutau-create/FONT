@@ -42,8 +42,11 @@ export default function GlyphEditorPage() {
   const [previewText, setPreviewText] = useState("Hello World! ABCDEFGabcdefg 0123456789");
   const [fontSize, setFontSize] = useState(48);
   const [fontUrl, setFontUrl] = useState<string | null>(null);
-  const [fontFamilyKey, setFontFamilyKey] = useState<number>(Date.now());
-  const [loadedFontFamily, setLoadedFontFamily] = useState<string | null>(null);
+  const [previewFont, setPreviewFont] = useState<{
+    status: "idle" | "loading" | "ready" | "error";
+    family: string | null;
+    error?: string;
+  }>({ status: "idle", family: null });
   const [generatingFormat, setGeneratingFormat] = useState<"ttf" | "otf" | null>(null);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [pendingWidth, setPendingWidth] = useState<number | null>(null);
@@ -97,25 +100,42 @@ export default function GlyphEditorPage() {
     if (fontFiles && fontFiles.length > 0) {
       const ttf = fontFiles.find(f => f.format === "ttf") ?? fontFiles[0];
       setFontUrl(ttf.fileUrl);
-      setFontFamilyKey(Date.now());
     }
   }, [fontFiles]);
 
-  // Load font imperatively via FontFace API to bypass browser @font-face cache
+  // Fetch font as binary → FontFace API (bypasses HTTP cache and auth issues)
   useEffect(() => {
-    if (!fontUrl) return;
-    const familyName = `PreviewFont_${fontFamilyKey}`;
-    const urlWithBust = `${fontUrl}?v=${fontFamilyKey}`;
-    const ff = new FontFace(familyName, `url('${urlWithBust}')`);
-    ff.load().then((loadedFace) => {
-      document.fonts.add(loadedFace);
-      setLoadedFontFamily(familyName);
-    }).catch((err) => {
-      console.warn("FontFace load failed:", err);
-      // Fallback: set family name anyway so style tag can handle it
-      setLoadedFontFamily(familyName);
-    });
-  }, [fontUrl, fontFamilyKey]);
+    if (!fontUrl) {
+      setPreviewFont({ status: "idle", family: null });
+      return;
+    }
+    let cancelled = false;
+    const family = `CustomFont_${Date.now()}`;
+    setPreviewFont({ status: "loading", family: null });
+
+    fetch(fontUrl, { credentials: "include", cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch font (HTTP ${res.status})`);
+        return res.arrayBuffer();
+      })
+      .then((buffer) => {
+        if (cancelled) return;
+        const face = new FontFace(family, buffer);
+        return face.load();
+      })
+      .then((loadedFace) => {
+        if (cancelled || !loadedFace) return;
+        document.fonts.add(loadedFace);
+        setPreviewFont({ status: "ready", family });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : "Font load failed";
+        setPreviewFont({ status: "error", family: null, error: msg });
+      });
+
+    return () => { cancelled = true; };
+  }, [fontUrl]);
 
   useEffect(() => {
     setPendingPath(null);
@@ -181,7 +201,6 @@ export default function GlyphEditorPage() {
       setGeneratingFormat(null);
       utils.font.listFiles.invalidate({ projectId });
       setFontUrl(data.url);
-      setFontFamilyKey(Date.now());
       setActiveTab("preview");
       toast.success(`${data.format.toUpperCase()} generated!`);
     },
@@ -874,52 +893,9 @@ export default function GlyphEditorPage() {
       {activeTab === "preview" && (
         <div className="flex-1 p-8 overflow-auto">
           <div className="brutal-tag mb-6">Live Preview</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-3 border-black p-6 brutal-shadow">
-            <div>
-              <label className="block font-black text-xs uppercase tracking-widest mb-2">Preview Text</label>
-              <textarea
-                className="brutal-input resize-none font-mono"
-                rows={3}
-                value={previewText}
-                onChange={e => setPreviewText(e.target.value)}
-                placeholder="Type something..."
-              />
-            </div>
-            <div>
-              <label className="block font-black text-xs uppercase tracking-widest mb-2">Font Size: {fontSize}px</label>
-              <input
-                type="range" min={12} max={200} value={fontSize}
-                onChange={e => setFontSize(parseInt(e.target.value))}
-                className="w-full accent-black mb-4" style={{ height: "4px" }}
-              />
-              <div className="flex gap-2 flex-wrap">
-                {[16, 24, 36, 48, 72, 96, 128].map(s => (
-                  <button key={s} onClick={() => setFontSize(s)}
-                    className={`brutal-btn-sm ${fontSize === s ? "bg-black text-white" : "bg-white text-black"}`}>{s}</button>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          {fontUrl ? (
-            <>
-              <div className="border-3 border-black p-8 brutal-shadow-lg min-h-40 bg-white overflow-auto mb-6">
-                <div style={{ fontFamily: loadedFontFamily ? `'${loadedFontFamily}', monospace` : "monospace", fontSize: `${fontSize}px`, lineHeight: 1.4, wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
-                  {previewText || "Type something in the preview text box..."}
-                </div>
-              </div>
-              <div className="flex gap-4 flex-wrap">
-                {fontFiles?.map(f => (
-                  <a key={f.id} href={f.fileUrl} download={`${project.name}.${f.format}`} className="brutal-btn flex items-center gap-2">
-                    <Download className="w-4 h-4" /> Download {f.format.toUpperCase()}
-                  </a>
-                ))}
-                <button onClick={() => handleGenerate("ttf")} disabled={!!generatingFormat} className="brutal-btn-outline flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4" /> Regenerate TTF
-                </button>
-              </div>
-            </>
-          ) : (
+          {/* No font yet */}
+          {!fontUrl ? (
             <div className="border-3 border-black border-dashed p-20 text-center">
               <div className="text-5xl font-black text-gray-200 uppercase tracking-tighter mb-4">No Font Yet</div>
               <p className="text-gray-500 mb-6 font-mono text-sm">Upload glyphs and generate a font to preview it here.</p>
@@ -932,6 +908,68 @@ export default function GlyphEditorPage() {
                 </button>
               </div>
             </div>
+          ) : previewFont.status === "loading" ? (
+            <div className="border-3 border-black p-20 text-center">
+              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" />
+              <p className="font-mono text-sm text-gray-500">Loading font...</p>
+            </div>
+          ) : previewFont.status === "error" ? (
+            <div className="border-3 border-black border-dashed p-16 text-center">
+              <div className="text-3xl font-black text-red-400 uppercase tracking-tighter mb-3">Load Failed</div>
+              <p className="font-mono text-xs text-gray-500 mb-6">{previewFont.error}</p>
+              <button
+                onClick={() => { setFontUrl(null); setTimeout(() => setFontUrl(fontUrl), 50); }}
+                className="brutal-btn flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 border-3 border-black p-6 brutal-shadow">
+                <div>
+                  <label className="block font-black text-xs uppercase tracking-widest mb-2">Preview Text</label>
+                  <textarea
+                    className="brutal-input resize-none font-mono"
+                    rows={3}
+                    value={previewText}
+                    onChange={e => setPreviewText(e.target.value)}
+                    placeholder="Type something..."
+                  />
+                </div>
+                <div>
+                  <label className="block font-black text-xs uppercase tracking-widest mb-2">Font Size: {fontSize}px</label>
+                  <input
+                    type="range" min={12} max={200} value={fontSize}
+                    onChange={e => setFontSize(parseInt(e.target.value))}
+                    className="w-full accent-black mb-4" style={{ height: "4px" }}
+                  />
+                  <div className="flex gap-2 flex-wrap">
+                    {[16, 24, 36, 48, 72, 96, 128].map(s => (
+                      <button key={s} onClick={() => setFontSize(s)}
+                        className={`brutal-btn-sm ${fontSize === s ? "bg-black text-white" : "bg-white text-black"}`}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-3 border-black p-8 brutal-shadow-lg min-h-40 bg-white overflow-auto mb-6">
+                <div style={{ fontFamily: `'${previewFont.family}', sans-serif`, fontSize: `${fontSize}px`, lineHeight: 1.4, wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                  {previewText || "Type something in the preview text box..."}
+                </div>
+              </div>
+
+              <div className="flex gap-4 flex-wrap">
+                {fontFiles?.map(f => (
+                  <a key={f.id} href={f.fileUrl} download={`${project.name}.${f.format}`} className="brutal-btn flex items-center gap-2">
+                    <Download className="w-4 h-4" /> Download {f.format.toUpperCase()}
+                  </a>
+                ))}
+                <button onClick={() => handleGenerate("ttf")} disabled={!!generatingFormat} className="brutal-btn-outline flex items-center gap-2">
+                  {generatingFormat === "ttf" ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Regenerate TTF
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
