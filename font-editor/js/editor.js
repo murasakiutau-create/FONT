@@ -204,9 +204,10 @@ class GlyphEditor {
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     const aw = this.glyph.advanceWidth || 600;
     text.setAttribute('x', aw / 2);
-    text.setAttribute('y', 0);
+    // y=ascender in sub-group maps to font y=0 (baseline)
+    text.setAttribute('y', ascender);
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'auto');
+    text.setAttribute('dominant-baseline', 'alphabetic');
     text.setAttribute('font-size', fontH);
     text.setAttribute('font-family', this.referenceFont);
     text.setAttribute('fill', '#8888cc');
