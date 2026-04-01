@@ -227,10 +227,10 @@ class GlyphEditor {
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
 
-    // Size: UPM * 0.96 — tuned so caps land on capHeight line
-    const adjustedSize = (upm || fontH) * 0.96;
-    // Nudge down by 2% of size to sit on baseline
-    const nudge = adjustedSize * 0.02;
+    // Size: UPM * 0.98
+    const adjustedSize = (upm || fontH) * 0.98;
+    // Nudge down by 1% of size to sit on baseline
+    const nudge = adjustedSize * 0.01;
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('transform', `translate(${aw / 2}, ${-nudge}) scale(1, -1)`);
     text.setAttribute('x', 0);
@@ -342,6 +342,17 @@ class GlyphEditor {
     this.svg.addEventListener('wheel', e => this._onWheel(e), { passive: false });
     this.svg.addEventListener('dblclick', e => this._onDblclick(e));
     this.svg.addEventListener('contextmenu', e => e.preventDefault());
+    // Escape to finalize pen path
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.editMode === 'pen' && this.penState) {
+        if (this.penState.cmds.length > 1) {
+          this._finalizePenPath();
+        } else {
+          this.penState = null;
+          this._renderPenPreview();
+        }
+      }
+    });
   }
 
   _getEventPos(e) {
@@ -350,17 +361,24 @@ class GlyphEditor {
   }
 
   _onMousedown(e) {
-    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer') || e.target.closest('#nodes-layer')) {
+    // Pen tool: accept clicks anywhere on the canvas
+    if (this.editMode === 'pen' && e.button === 0 && !e.altKey) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
       if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
         this.dragState = { type: 'pan', startSx: sx, startSy: sy, startPanX: this.panX, startPanY: this.panY };
         e.preventDefault(); return;
       }
-      // Pen tool handling
-      if (this.editMode === 'pen' && e.button === 0) {
-        this._penMousedown(fp, e);
-        return;
+      this._penMousedown(fp, e);
+      e.preventDefault();
+      return;
+    }
+    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer') || e.target.closest('#nodes-layer') || e.target.closest('#pen-preview')) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
+        this.dragState = { type: 'pan', startSx: sx, startSy: sy, startPanX: this.panX, startPanY: this.panY };
+        e.preventDefault(); return;
       }
       if (this.editMode === 'select' || this.editMode === 'node') {
         // Check if clicking on the glyph path for move (select mode only)
@@ -399,14 +417,12 @@ class GlyphEditor {
   }
 
   _onMousemove(e) {
-    // Pen tool preview
-    if (this.editMode === 'pen') {
+    // Pen tool preview (always track cursor for preview line)
+    if (this.editMode === 'pen' && this.penState) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
-      if (this.penState && this.penState.dragging && this.penState.pendingPoint) {
-        // dragging to create curve handle
-      }
       this._penMousemove(fp);
+      if (!this.dragState) return;
     }
     if (!this.dragState) return;
     const { sx, sy } = this._getEventPos(e);
@@ -489,10 +505,12 @@ class GlyphEditor {
   }
 
   _onMouseup(e) {
-    if (this.editMode === 'pen' && this.penState && this.penState.dragging) {
+    if (this.editMode === 'pen' && this.penState) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
-      this._penMouseup(fp);
+      if (this.penState.dragging) {
+        this._penMouseup(fp);
+      }
     }
     this.dragState = null;
   }
