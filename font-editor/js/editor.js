@@ -226,22 +226,22 @@ class GlyphEditor {
     const { ascender, descender, upm } = this.options;
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
-    // Render text directly in font coordinate space (Y-up in mainGroup).
-    // SVG <text> needs Y-down, so wrap in a group that flips Y around baseline (y=0).
-    // scale(1,-1) flips Y; text is then drawn in normal SVG orientation at y=0 = baseline.
-    const g = this._el('g', { transform: 'scale(1,-1)' });
+    const fontSize = upm || fontH;
+    // Place text at font baseline (y=0). The mainGroup has Y-up, so we need
+    // to flip the text. Use a transform on the text itself that:
+    //   1. Translates to (x, baseline=0)
+    //   2. Scales Y by -1 to flip text right-side-up
+    // The text's y=0 in its local flipped coords = font y=0 = baseline exactly.
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', aw / 2);
+    text.setAttribute('transform', `translate(${aw / 2}, 0) scale(1, -1)`);
+    text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'alphabetic');
-    // font-size = UPM so the reference glyph matches the em-square exactly
-    text.setAttribute('font-size', upm || fontH);
+    text.setAttribute('font-size', fontSize);
     text.setAttribute('font-family', this.referenceFont);
     text.setAttribute('fill', '#888888');
     text.textContent = this.glyph.char;
-    g.appendChild(text);
-    this.refLayer.appendChild(g);
+    this.refLayer.appendChild(text);
   }
 
   _renderPaths() {
