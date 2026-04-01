@@ -223,27 +223,59 @@ class GlyphEditor {
   _renderReference() {
     this.refLayer.innerHTML = '';
     if (!this.showReference || !this.glyph || !this.glyph.char) return;
-    const { ascender, descender, upm } = this.options;
+    const { ascender, descender, upm, capHeight } = this.options;
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
-    const fontSize = upm || fontH;
-    // Place text at font baseline (y=0). The mainGroup has Y-up, so we need
-    // to flip the text. Use a transform on the text itself that:
-    //   1. Translates to (x, baseline=0)
-    //   2. Scales Y by -1 to flip text right-side-up
-    // The text's y=0 in its local flipped coords = font y=0 = baseline exactly.
+
+    // Measure the reference font's actual cap height using 'H' as reference,
+    // then scale font-size so capitals match our capHeight exactly.
+    const measuredFontSize = this._getAdjustedFontSize();
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    // Nudge down by 3% of fontSize to compensate for browser text rendering offset
-    const baselineNudge = fontSize * 0.03;
-    text.setAttribute('transform', `translate(${aw / 2}, ${-baselineNudge}) scale(1, -1)`);
+    text.setAttribute('transform', `translate(${aw / 2}, 0) scale(1, -1)`);
     text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', fontSize);
+    text.setAttribute('font-size', measuredFontSize);
     text.setAttribute('font-family', this.referenceFont);
     text.setAttribute('fill', '#888888');
     text.textContent = this.glyph.char;
     this.refLayer.appendChild(text);
+  }
+
+  _getAdjustedFontSize() {
+    const { upm, capHeight } = this.options;
+    const fontH = (this.options.ascender || 800) - (this.options.descender || -200);
+    const baseFontSize = upm || fontH;
+    const cacheKey = this.referenceFont + '_' + baseFontSize;
+
+    // Cache the measured ratio per font to avoid re-measuring every render
+    if (!this._fontSizeCache) this._fontSizeCache = {};
+    if (this._fontSizeCache[cacheKey]) return this._fontSizeCache[cacheKey];
+
+    // Create a temporary text element to measure the actual cap height
+    const tmpText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    tmpText.setAttribute('font-size', baseFontSize);
+    tmpText.setAttribute('font-family', this.referenceFont);
+    tmpText.setAttribute('x', 0);
+    tmpText.setAttribute('y', 0);
+    tmpText.textContent = 'H';
+    // Append to SVG root temporarily (must be in DOM to get bbox)
+    this.svg.appendChild(tmpText);
+    let bbox;
+    try { bbox = tmpText.getBBox(); } catch (e) { bbox = null; }
+    this.svg.removeChild(tmpText);
+
+    if (!bbox || bbox.height === 0) {
+      this._fontSizeCache[cacheKey] = baseFontSize;
+      return baseFontSize;
+    }
+
+    // bbox.height = the actual rendered cap height of 'H' at baseFontSize
+    // Scale font-size so that rendered cap height = our capHeight
+    const targetCapHeight = capHeight || 700;
+    const adjustedFontSize = baseFontSize * (targetCapHeight / bbox.height);
+    this._fontSizeCache[cacheKey] = adjustedFontSize;
+    return adjustedFontSize;
   }
 
   _renderPaths() {
@@ -852,6 +884,7 @@ class GlyphEditor {
 
   setReferenceFont(font) {
     this.referenceFont = font;
+    this._fontSizeCache = {}; // clear cache on font change
     this._renderReference();
   }
 
