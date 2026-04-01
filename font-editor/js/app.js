@@ -632,12 +632,7 @@ const App = {
       this._notify('グリフを削除しました');
     });
 
-    // Export buttons
-    document.getElementById('export-ttf')?.addEventListener('click', () => {
-      this._saveCurrentGlyph();
-      generateAndDownloadFont(this.project, 'ttf');
-      this._notify('TTFをダウンロードしています...');
-    });
+    // Export button
     document.getElementById('export-otf')?.addEventListener('click', () => {
       this._saveCurrentGlyph();
       generateAndDownloadFont(this.project, 'otf');

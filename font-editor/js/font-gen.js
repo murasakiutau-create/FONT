@@ -1,6 +1,6 @@
 /**
- * font-gen.js — TTF/OTF font generation using opentype.js
- * Converts FontProject data into a downloadable font file.
+ * font-gen.js — OTF font generation using opentype.js
+ * Converts FontProject data into a downloadable OTF font file.
  */
 
 function generateAndDownloadFont(project, format = 'ttf') {
@@ -119,7 +119,7 @@ function generateAndDownloadFont(project, format = 'ttf') {
     } catch (e) { console.warn('Ligature export note:', e); }
   }
 
-  font.download(`${project.name || 'MyFont'}.${format}`);
+  font.download(`${project.name || 'MyFont'}.otf`);
   return font;
 }
 
