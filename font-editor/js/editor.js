@@ -227,10 +227,13 @@ class GlyphEditor {
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
 
-    // Size: UPM * 0.98
-    const adjustedSize = (upm || fontH) * 0.98;
-    // Nudge down by 3% of size to sit on baseline
-    const nudge = adjustedSize * 0.03;
+    // Per-font tuning: serif fonts need different size/nudge than sans-serif
+    const isSerif = /serif|Georgia|Times|Courier/i.test(this.referenceFont) && !/sans/i.test(this.referenceFont);
+    const sizeMul = isSerif ? 0.98 : 1.0;
+    const nudgePct = isSerif ? 0.03 : 0.0;
+
+    const adjustedSize = (upm || fontH) * sizeMul;
+    const nudge = adjustedSize * nudgePct;
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('transform', `translate(${aw / 2}, ${-nudge}) scale(1, -1)`);
     text.setAttribute('x', 0);
