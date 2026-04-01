@@ -243,37 +243,36 @@ class GlyphEditor {
   }
 
   _getAdjustedFontSize() {
-    const { upm, capHeight } = this.options;
-    const fontH = (this.options.ascender || 800) - (this.options.descender || -200);
-    const baseFontSize = upm || fontH;
-    const cacheKey = this.referenceFont + '_' + baseFontSize;
+    const { capHeight } = this.options;
+    const targetCap = capHeight || 700;
+    const cacheKey = this.referenceFont;
 
-    // Cache the measured ratio per font to avoid re-measuring every render
     if (!this._fontSizeCache) this._fontSizeCache = {};
     if (this._fontSizeCache[cacheKey]) return this._fontSizeCache[cacheKey];
 
-    // Create a temporary text element to measure the actual cap height
+    // Measure the cap-height ratio of the reference font:
+    // Render 'H' at a known size (100px) in screen coords, get the ratio
+    const testSize = 100;
     const tmpText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    tmpText.setAttribute('font-size', baseFontSize);
+    tmpText.setAttribute('font-size', testSize);
     tmpText.setAttribute('font-family', this.referenceFont);
-    tmpText.setAttribute('x', 0);
+    tmpText.setAttribute('x', -9999);
     tmpText.setAttribute('y', 0);
     tmpText.textContent = 'H';
-    // Append to SVG root temporarily (must be in DOM to get bbox)
     this.svg.appendChild(tmpText);
     let bbox;
     try { bbox = tmpText.getBBox(); } catch (e) { bbox = null; }
     this.svg.removeChild(tmpText);
 
     if (!bbox || bbox.height === 0) {
-      this._fontSizeCache[cacheKey] = baseFontSize;
-      return baseFontSize;
+      this._fontSizeCache[cacheKey] = targetCap / 0.7; // fallback
+      return this._fontSizeCache[cacheKey];
     }
 
-    // bbox.height = the actual rendered cap height of 'H' at baseFontSize
-    // Scale font-size so that rendered cap height = our capHeight
-    const targetCapHeight = capHeight || 700;
-    const adjustedFontSize = baseFontSize * (targetCapHeight / bbox.height);
+    // capRatio = how much of font-size is the actual cap height
+    const capRatio = bbox.height / testSize;
+    // fontSize in font units so that rendered cap height = targetCap
+    const adjustedFontSize = targetCap / capRatio;
     this._fontSizeCache[cacheKey] = adjustedFontSize;
     return adjustedFontSize;
   }
