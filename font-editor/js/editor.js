@@ -227,14 +227,12 @@ class GlyphEditor {
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
 
-    // font-size = UPM, then scale down slightly so caps fit capHeight
-    const rawSize = upm || fontH;
-    // Typical fonts: cap height ≈ 70% of em. Our capHeight/UPM = 0.7.
-    // Scale by capHeight/ascender to bring caps from ~ascender to ~capHeight.
-    const scale = (capHeight || 700) / (ascender || 800);
-    const adjustedSize = rawSize * scale;
+    // Size: UPM * 0.96 — tuned so caps land on capHeight line
+    const adjustedSize = (upm || fontH) * 0.96;
+    // Nudge down by 2% of size to sit on baseline
+    const nudge = adjustedSize * 0.02;
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('transform', `translate(${aw / 2}, 0) scale(1, -1)`);
+    text.setAttribute('transform', `translate(${aw / 2}, ${-nudge}) scale(1, -1)`);
     text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
