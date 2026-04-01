@@ -227,55 +227,24 @@ class GlyphEditor {
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
 
-    // Measure the reference font's actual cap height using 'H' as reference,
-    // then scale font-size so capitals match our capHeight exactly.
-    const measuredFontSize = this._getAdjustedFontSize();
+    // font-size = UPM, then scale down slightly so caps fit capHeight
+    const rawSize = upm || fontH;
+    // Typical fonts: cap height ≈ 70% of em. Our capHeight/UPM = 0.7.
+    // Scale by capHeight/ascender to bring caps from ~ascender to ~capHeight.
+    const scale = (capHeight || 700) / (ascender || 800);
+    const adjustedSize = rawSize * scale;
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('transform', `translate(${aw / 2}, 0) scale(1, -1)`);
     text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('font-size', measuredFontSize);
+    text.setAttribute('font-size', adjustedSize);
     text.setAttribute('font-family', this.referenceFont);
     text.setAttribute('fill', '#888888');
     text.textContent = this.glyph.char;
     this.refLayer.appendChild(text);
   }
 
-  _getAdjustedFontSize() {
-    const { capHeight } = this.options;
-    const targetCap = capHeight || 700;
-    const cacheKey = this.referenceFont;
-
-    if (!this._fontSizeCache) this._fontSizeCache = {};
-    if (this._fontSizeCache[cacheKey]) return this._fontSizeCache[cacheKey];
-
-    // Measure the cap-height ratio of the reference font:
-    // Render 'H' at a known size (100px) in screen coords, get the ratio
-    const testSize = 100;
-    const tmpText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    tmpText.setAttribute('font-size', testSize);
-    tmpText.setAttribute('font-family', this.referenceFont);
-    tmpText.setAttribute('x', -9999);
-    tmpText.setAttribute('y', 0);
-    tmpText.textContent = 'H';
-    this.svg.appendChild(tmpText);
-    let bbox;
-    try { bbox = tmpText.getBBox(); } catch (e) { bbox = null; }
-    this.svg.removeChild(tmpText);
-
-    if (!bbox || bbox.height === 0) {
-      this._fontSizeCache[cacheKey] = targetCap / 0.7; // fallback
-      return this._fontSizeCache[cacheKey];
-    }
-
-    // capRatio = how much of font-size is the actual cap height
-    const capRatio = bbox.height / testSize;
-    // fontSize in font units so that rendered cap height = targetCap
-    const adjustedFontSize = targetCap / capRatio;
-    this._fontSizeCache[cacheKey] = adjustedFontSize;
-    return adjustedFontSize;
-  }
 
   _renderPaths() {
     this.pathsLayer.innerHTML = '';
@@ -883,7 +852,6 @@ class GlyphEditor {
 
   setReferenceFont(font) {
     this.referenceFont = font;
-    this._fontSizeCache = {}; // clear cache on font change
     this._renderReference();
   }
 
