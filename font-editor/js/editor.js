@@ -233,7 +233,9 @@ class GlyphEditor {
     //   2. Scales Y by -1 to flip text right-side-up
     // The text's y=0 in its local flipped coords = font y=0 = baseline exactly.
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('transform', `translate(${aw / 2}, 0) scale(1, -1)`);
+    // Nudge down by 3% of fontSize to compensate for browser text rendering offset
+    const baselineNudge = fontSize * 0.03;
+    text.setAttribute('transform', `translate(${aw / 2}, ${-baselineNudge}) scale(1, -1)`);
     text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
