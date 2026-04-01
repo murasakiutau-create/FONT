@@ -30,6 +30,9 @@ class GlyphEditor {
     this.showHandles = true;
     this.dragState = null;
     this.customGuides = [];   // array of Y values for custom guidelines
+    this.customGuidesX = [];  // array of X values for custom vertical guidelines
+    this.refSizeOverride = null;
+    this.refNudgeOverride = null;
     // Pen tool state
     this.penState = null;     // { cmds: [], firstPoint: {x,y}, dragging: false, dragStart: {x,y} }
 
@@ -203,7 +206,7 @@ class GlyphEditor {
     const lsb = this._el('line', { x1: sx0, y1: 0, x2: sx0, y2: H, class: 'guide-line guide-lsb' });
     this.gridLayer.appendChild(lsb);
 
-    // Custom guidelines
+    // Custom horizontal guidelines (Y)
     if (this.customGuides && this.customGuides.length) {
       for (const gy of this.customGuides) {
         const sy = this.fontToScreen(0, gy).y;
@@ -214,7 +217,21 @@ class GlyphEditor {
         gLabel.setAttribute('y', sy - 3);
         gLabel.setAttribute('class', 'guide-label');
         gLabel.setAttribute('text-anchor', 'end');
-        gLabel.textContent = gy;
+        gLabel.textContent = 'Y=' + gy;
+        this.gridLayer.appendChild(gLabel);
+      }
+    }
+    // Custom vertical guidelines (X)
+    if (this.customGuidesX && this.customGuidesX.length) {
+      for (const gx of this.customGuidesX) {
+        const sx = this.fontToScreen(gx, 0).x;
+        const gLine = this._el('line', { x1: sx, y1: 0, x2: sx, y2: H, class: 'guide-line guide-custom' });
+        this.gridLayer.appendChild(gLine);
+        const gLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        gLabel.setAttribute('x', sx + 3);
+        gLabel.setAttribute('y', 14);
+        gLabel.setAttribute('class', 'guide-label');
+        gLabel.textContent = 'X=' + gx;
         this.gridLayer.appendChild(gLabel);
       }
     }
@@ -231,16 +248,20 @@ class GlyphEditor {
     const rawSize = upm || fontH;
     let sizeMul, nudgePct;
     if (this.referenceFont === 'monospace') {
-      sizeMul = 0.93;
-      nudgePct = -0.01; // slightly up
+      sizeMul = 0.91;
+      nudgePct = -0.02; // slightly up
     } else if (this.referenceFont === 'sans-serif') {
-      sizeMul = 0.95;
+      sizeMul = 0.96;
       nudgePct = 0.0;
     } else {
       // serif
       sizeMul = 0.98;
       nudgePct = 0.03;
     }
+
+    // Allow manual override from options
+    if (this.refSizeOverride != null) sizeMul = this.refSizeOverride;
+    if (this.refNudgeOverride != null) nudgePct = this.refNudgeOverride;
 
     const adjustedSize = rawSize * sizeMul;
     const nudge = adjustedSize * nudgePct;

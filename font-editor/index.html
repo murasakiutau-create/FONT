@@ -17,22 +17,14 @@
     <span id="font-name-display">MyFont</span>
     <div class="sep"></div>
 
-    <!-- Upload current glyph -->
-    <button class="header-btn" id="upload-svg-btn" title="現在の文字にSVGをインポート">
+    <!-- SVG Import (unified) -->
+    <button class="header-btn btn-blue" id="import-btn" title="SVGをインポート">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      SVG取込
+      取込
     </button>
-    <button class="header-btn" id="batch-upload-btn" title="ファイル名からUnicode判定して一括インポート">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      一括取込
-    </button>
-    <button class="header-btn" id="template-btn" title="テンプレートをダウンロード">
+    <button class="header-btn btn-green" id="template-btn" title="テンプレートをダウンロード">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       テンプレ
-    </button>
-    <button class="header-btn" id="template-upload-btn" title="記入済みテンプレートを読み込んで自動反映">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      テンプレ取込
     </button>
     <input type="file" id="template-file-input" accept=".svg,image/svg+xml" class="hidden-input">
     <button class="header-btn" id="copy-glyph-btn" title="グリフをコピー (Ctrl+C)">
@@ -43,7 +35,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
       貼付
     </button>
-    <button class="header-btn" id="delete-glyph-btn" title="現在のグリフを削除">
+    <button class="header-btn btn-red" id="delete-glyph-btn" title="現在のグリフを削除">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
       削除
     </button>
@@ -59,13 +51,13 @@
     </button>
 
     <div class="sep"></div>
-    <button class="header-btn accent" id="export-ttf" title="TTFフォントをダウンロード">
+    <button class="header-btn btn-orange" id="export-ttf" title="TTFフォントをダウンロード">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export TTF
+      TTF
     </button>
-    <button class="header-btn secondary" id="export-otf" title="OTFフォントをダウンロード">
+    <button class="header-btn btn-orange" id="export-otf" title="OTFフォントをダウンロード">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export OTF
+      OTF
     </button>
     <button class="header-btn" id="settings-btn" title="フォント設定">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2"/></svg>
@@ -458,6 +450,19 @@ abcdefghijklmnopqrstuvwxyz
           </select>
         </div>
 
+        <div class="section-hdr">お手本サイズ・位置</div>
+        <div class="slider-row">
+          <label>サイズ</label>
+          <input type="range" id="ref-size-slider" min="0.80" max="1.10" step="0.01" value="0.96">
+          <span class="slider-val" id="ref-size-val">0.96</span>
+        </div>
+        <div class="slider-row">
+          <label>Y位置</label>
+          <input type="range" id="ref-nudge-slider" min="-0.05" max="0.08" step="0.005" value="0.0">
+          <span class="slider-val" id="ref-nudge-val">0.00</span>
+        </div>
+        <button class="panel-btn" id="ref-reset-btn" style="font-size:10px">デフォルトに戻す</button>
+
         <div class="section-hdr">表示オプション</div>
         <div class="toggle-row">
           <input type="checkbox" id="show-handles" checked>
@@ -469,6 +474,11 @@ abcdefghijklmnopqrstuvwxyz
           <label>Y</label>
           <input type="number" id="guide-y-input" class="num-input" placeholder="Y座標" step="1">
           <button class="panel-btn" id="guide-add-btn" style="flex:none;padding:3px 8px;margin-bottom:0">追加</button>
+        </div>
+        <div class="input-row">
+          <label>X</label>
+          <input type="number" id="guide-x-input" class="num-input" placeholder="X座標" step="1">
+          <button class="panel-btn" id="guide-x-add-btn" style="flex:none;padding:3px 8px;margin-bottom:0">追加</button>
         </div>
         <div id="custom-guides-list" style="max-height:150px;overflow-y:auto;font-size:11px"></div>
       </div>
@@ -565,6 +575,27 @@ abcdefghijklmnopqrstuvwxyz
 
         <button type="submit" class="settings-submit">保存</button>
       </form>
+    </div>
+  </div>
+
+  <!-- ─── Import Dialog ──────────────────────────────────────────────────── -->
+  <div id="import-dialog" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">SVG取り込み<button class="close-btn" id="import-dialog-close">✕</button></div>
+      <div class="modal-body">
+        <button class="modal-choice-btn" id="import-single">
+          <strong>1文字ずつ取り込み</strong>
+          <span>現在選択中の文字スロットにSVGをインポートします。</span>
+        </button>
+        <button class="modal-choice-btn" id="import-batch">
+          <strong>一括取り込み</strong>
+          <span>ファイル名からUnicodeを判定して自動で割り当てます。<br>例: A.svg, U+0041.svg</span>
+        </button>
+        <button class="modal-choice-btn" id="import-template">
+          <strong>テンプレートから取り込み</strong>
+          <span>テンプレートに描いた文字を自動検出して一括インポートします。</span>
+        </button>
+      </div>
     </div>
   </div>
 

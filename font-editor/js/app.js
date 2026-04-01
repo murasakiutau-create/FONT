@@ -545,23 +545,40 @@ const App = {
       }
     });
 
-    // SVG upload button
-    document.getElementById('upload-svg-btn')?.addEventListener('click', () => {
+    // Import dialog
+    document.getElementById('import-btn')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'flex';
+    });
+    document.getElementById('import-dialog-close')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
+    });
+    document.getElementById('import-dialog')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+    });
+    document.getElementById('import-single')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
       if (this.currentUnicode == null) return;
       const inp = document.getElementById('svg-file-input');
       inp.value = '';
       inp.click();
     });
-    document.getElementById('svg-file-input')?.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file && this.currentUnicode != null) this._importSVGForChar(this.currentUnicode, file);
-    });
-
-    // Batch upload
-    document.getElementById('batch-upload-btn')?.addEventListener('click', () => {
+    document.getElementById('import-batch')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
       const inp = document.getElementById('batch-file-input');
       inp.value = '';
       inp.click();
+    });
+    document.getElementById('import-template')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
+      const inp = document.getElementById('template-file-input');
+      inp.value = '';
+      inp.click();
+    });
+
+    // SVG file inputs (still needed)
+    document.getElementById('svg-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file && this.currentUnicode != null) this._importSVGForChar(this.currentUnicode, file);
     });
     document.getElementById('batch-file-input')?.addEventListener('change', e => {
       this._batchImportSVGs(Array.from(e.target.files));
@@ -883,12 +900,62 @@ const App = {
     // ── Reference font ──
     document.getElementById('ref-font-select')?.addEventListener('change', e => {
       this.editor.setReferenceFont(e.target.value);
+      // Reset overrides to new font defaults
+      this.editor.refSizeOverride = null;
+      this.editor.refNudgeOverride = null;
+      const font = e.target.value;
+      let sz = 0.96, nd = 0.0;
+      if (font === 'serif') { sz = 0.98; nd = 0.03; }
+      else if (font === 'monospace') { sz = 0.91; nd = -0.02; }
+      document.getElementById('ref-size-slider').value = sz;
+      document.getElementById('ref-size-val').textContent = sz.toFixed(2);
+      document.getElementById('ref-nudge-slider').value = nd;
+      document.getElementById('ref-nudge-val').textContent = nd.toFixed(3);
     });
     document.getElementById('show-reference')?.addEventListener('change', e => {
       this.editor.setShowReference(e.target.checked);
     });
     document.getElementById('show-handles')?.addEventListener('change', e => {
       this.editor.setShowHandles(e.target.checked);
+    });
+
+    // ── Reference size/nudge sliders ──
+    document.getElementById('ref-size-slider')?.addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      document.getElementById('ref-size-val').textContent = v.toFixed(2);
+      this.editor.refSizeOverride = v;
+      this.editor._renderReference();
+    });
+    document.getElementById('ref-nudge-slider')?.addEventListener('input', e => {
+      const v = parseFloat(e.target.value);
+      document.getElementById('ref-nudge-val').textContent = v.toFixed(3);
+      this.editor.refNudgeOverride = v;
+      this.editor._renderReference();
+    });
+    document.getElementById('ref-reset-btn')?.addEventListener('click', () => {
+      this.editor.refSizeOverride = null;
+      this.editor.refNudgeOverride = null;
+      // Reset sliders to current font defaults
+      const font = this.editor.referenceFont;
+      let sz = 0.96, nd = 0.0;
+      if (font === 'serif') { sz = 0.98; nd = 0.03; }
+      else if (font === 'monospace') { sz = 0.91; nd = -0.02; }
+      document.getElementById('ref-size-slider').value = sz;
+      document.getElementById('ref-size-val').textContent = sz.toFixed(2);
+      document.getElementById('ref-nudge-slider').value = nd;
+      document.getElementById('ref-nudge-val').textContent = nd.toFixed(3);
+      this.editor._renderReference();
+    });
+
+    // ── Custom guideline X ──
+    document.getElementById('guide-x-add-btn')?.addEventListener('click', () => {
+      const val = parseFloat(document.getElementById('guide-x-input')?.value);
+      if (isNaN(val)) return;
+      if (!this.editor.customGuidesX) this.editor.customGuidesX = [];
+      this.editor.customGuidesX.push(val);
+      document.getElementById('guide-x-input').value = '';
+      this.editor.render();
+      this._renderCustomGuidesList();
     });
 
     // ── Settings panel ──
@@ -1732,20 +1799,36 @@ const App = {
     const container = document.getElementById('custom-guides-list');
     if (!container) return;
     container.innerHTML = '';
-    if (!this.editor.customGuides || !this.editor.customGuides.length) {
+    const yGuides = this.editor.customGuides || [];
+    const xGuides = this.editor.customGuidesX || [];
+    if (!yGuides.length && !xGuides.length) {
       container.innerHTML = '<div style="color:var(--text3);padding:4px">ガイドラインなし</div>';
       return;
     }
-    for (let i = 0; i < this.editor.customGuides.length; i++) {
-      const y = this.editor.customGuides[i];
+    for (let i = 0; i < yGuides.length; i++) {
       const item = document.createElement('div');
       item.className = 'guide-item';
-      item.innerHTML = `<span class="guide-val">Y = ${y}</span>`;
+      item.innerHTML = `<span class="guide-val">Y = ${yGuides[i]}</span>`;
       const delBtn = document.createElement('button');
       delBtn.className = 'guide-del';
       delBtn.textContent = '×';
       delBtn.addEventListener('click', () => {
         this.editor.customGuides.splice(i, 1);
+        this.editor.render();
+        this._renderCustomGuidesList();
+      });
+      item.appendChild(delBtn);
+      container.appendChild(item);
+    }
+    for (let i = 0; i < xGuides.length; i++) {
+      const item = document.createElement('div');
+      item.className = 'guide-item';
+      item.innerHTML = `<span class="guide-val">X = ${xGuides[i]}</span>`;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'guide-del';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', () => {
+        this.editor.customGuidesX.splice(i, 1);
         this.editor.render();
         this._renderCustomGuidesList();
       });

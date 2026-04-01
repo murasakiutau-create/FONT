@@ -58,6 +58,15 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
 .header-btn.accent:hover { background: #333; }
 .header-btn.secondary { background: #333; border-color: #333; color: #fff; }
 .header-btn.secondary:hover { background: #555; }
+/* Color buttons */
+.btn-blue { background: #6b8fa3 !important; border-color: #6b8fa3 !important; color: #fff !important; }
+.btn-blue:hover { background: #5a7e92 !important; }
+.btn-green { background: #7a9b7e !important; border-color: #7a9b7e !important; color: #fff !important; }
+.btn-green:hover { background: #698a6d !important; }
+.btn-red { background: #c07070 !important; border-color: #c07070 !important; color: #fff !important; }
+.btn-red:hover { background: #a85e5e !important; }
+.btn-orange { background: #c49a5c !important; border-color: #c49a5c !important; color: #fff !important; }
+.btn-orange:hover { background: #b08a4e !important; }
 .header-btn svg { width: 14px; height: 14px; }
 
 /* ─── Main Layout ────────────────────────────────────────────────────────── */
@@ -96,10 +105,10 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
   cursor: pointer; position: relative; transition: all 0.12s; overflow: hidden;
 }
 .glyph-cell:hover { background: #e0e0e0; border-color: #999; }
-.glyph-cell.active { border-color: #000; background: #000; }
+.glyph-cell.active { border-color: #c07070; background: #c07070; }
 .glyph-cell.active .glyph-char { color: #fff; }
-.glyph-cell.has-glyph { border-color: #666; background: #f0f0f0; }
-.glyph-cell.has-glyph.active { border-color: #000; background: #000; }
+.glyph-cell.has-glyph { border-color: #7a9b7e; background: #e8f0e9; }
+.glyph-cell.has-glyph.active { border-color: #c07070; background: #c07070; }
 .glyph-cell.drag-over { border-color: #000; background: #ddd; }
 .glyph-char { font-size: 18px; color: #333; line-height: 1; }
 .glyph-badge { position: absolute; bottom: 1px; right: 2px; font-size: 6px; color: #000; line-height: 1; }
