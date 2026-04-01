@@ -599,6 +599,8 @@ class GlyphEditor {
 
   _finalizePenPath() {
     if (!this.penState || !this.glyph) return;
+    // Notify before change so undo snapshot captures state BEFORE pen path
+    if (this.options.onBeforePenFinalize) this.options.onBeforePenFinalize();
     const newCmds = this.penState.cmds;
     this.glyph.pathData = this.glyph.pathData.concat(newCmds);
     this.penState = null;

@@ -85,6 +85,7 @@ const App = {
       onBBoxChange: (bbox) => this._onBBoxChange(bbox),
       onSelectionChange: (cmd, idx) => this._onSelectionChange(cmd, idx),
       onZoomChange: (z) => this._onZoomChange(z),
+      onBeforePenFinalize: () => this._pushUndo(),
     });
 
     this._buildGlyphGrid();
