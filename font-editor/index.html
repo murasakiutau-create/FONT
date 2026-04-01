@@ -20,34 +20,34 @@
     <!-- SVG Import (unified) -->
     <button class="header-btn btn-blue" id="import-btn" title="SVGをインポート">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      取込
+      <span data-i18n="ed_import">取込</span>
     </button>
     <button class="header-btn btn-green" id="template-btn" title="テンプレートをダウンロード">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
-      テンプレ
+      <span data-i18n="ed_template">テンプレ</span>
     </button>
     <input type="file" id="template-file-input" accept=".svg,image/svg+xml" class="hidden-input">
     <button class="header-btn" id="copy-glyph-btn" title="グリフをコピー (Ctrl+C)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      コピー
+      <span data-i18n="ed_copy">コピー</span>
     </button>
     <button class="header-btn" id="paste-glyph-btn" title="グリフを貼付 (Ctrl+V)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
-      貼付
+      <span data-i18n="ed_paste">貼付</span>
     </button>
     <button class="header-btn btn-red" id="delete-glyph-btn" title="現在のグリフを削除">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
-      削除
+      <span data-i18n="ed_delete">削除</span>
     </button>
 
     <div class="sep"></div>
     <button class="header-btn" id="save-project" title="プロジェクトをJSONで保存">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      保存
+      <span data-i18n="ed_save">保存</span>
     </button>
     <button class="header-btn" id="load-project" title="プロジェクトを読み込む">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      開く
+      <span data-i18n="ed_open">開く</span>
     </button>
 
     <div class="sep"></div>
@@ -57,8 +57,9 @@
     </button>
     <button class="header-btn" id="settings-btn" title="フォント設定">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M2 12h2M20 12h2"/></svg>
-      設定
+      <span data-i18n="ed_settings">設定</span>
     </button>
+    <button class="header-btn lang-toggle" onclick="I18N.toggle()" style="font-size:11px;padding:4px 8px">EN</button>
   </header>
 
   <!-- ─── Hidden file inputs ────────────────────────────────────────────── -->
@@ -72,7 +73,7 @@
 
     <!-- Left: Glyph Grid -->
     <aside id="left-panel">
-      <div class="panel-title">グリフ一覧</div>
+      <div class="panel-title" data-i18n="ed_glyph_list">グリフ一覧</div>
       <div id="glyph-search-wrap">
         <input type="text" id="glyph-search" placeholder="検索 (文字/Unicode)..." autocomplete="off">
       </div>
@@ -84,8 +85,8 @@
 
       <!-- Tab row -->
       <div id="tab-row">
-        <button class="main-tab-btn active" data-tab="editor">エディタ</button>
-        <button class="main-tab-btn" data-tab="preview">プレビュー</button>
+        <button class="main-tab-btn active" data-tab="editor" data-i18n="ed_editor">エディタ</button>
+        <button class="main-tab-btn" data-tab="preview" data-i18n="ed_preview">プレビュー</button>
       </div>
 
       <!-- ── Editor View ── -->
@@ -204,13 +205,13 @@ abcdefghijklmnopqrstuvwxyz
     <!-- Right: Properties Panel -->
     <aside id="right-panel">
       <div class="rtab-bar">
-        <button class="rtab-btn active" data-tab="transform">変形</button>
-        <button class="rtab-btn" data-tab="nodes">ノード</button>
-        <button class="rtab-btn" data-tab="bearing">ベアリング</button>
-        <button class="rtab-btn" data-tab="kerning">カーニング</button>
-        <button class="rtab-btn" data-tab="pathtools">パス</button>
-        <button class="rtab-btn" data-tab="ligatures">リガチャ</button>
-        <button class="rtab-btn" data-tab="view">表示</button>
+        <button class="rtab-btn active" data-tab="transform" data-i18n="ed_tab_transform">変形</button>
+        <button class="rtab-btn" data-tab="nodes" data-i18n="ed_tab_nodes">ノード</button>
+        <button class="rtab-btn" data-tab="bearing" data-i18n="ed_tab_bearing">ベアリング</button>
+        <button class="rtab-btn" data-tab="kerning" data-i18n="ed_tab_kerning">カーニング</button>
+        <button class="rtab-btn" data-tab="pathtools" data-i18n="ed_tab_path">パス</button>
+        <button class="rtab-btn" data-tab="ligatures" data-i18n="ed_tab_liga">リガチャ</button>
+        <button class="rtab-btn" data-tab="view" data-i18n="ed_tab_view">表示</button>
       </div>
 
       <!-- ── Transform Tab ── -->
@@ -604,23 +605,23 @@ abcdefghijklmnopqrstuvwxyz
   <!-- ─── Import Dialog ──────────────────────────────────────────────────── -->
   <div id="import-dialog" class="modal-overlay" style="display:none">
     <div class="modal-box">
-      <div class="modal-header">SVG取り込み<button class="close-btn" id="import-dialog-close">✕</button></div>
+      <div class="modal-header"><span data-i18n="ed_import">取り込み</span><button class="close-btn" id="import-dialog-close">✕</button></div>
       <div class="modal-body">
         <button class="modal-choice-btn" id="import-single">
-          <strong>1文字ずつ取り込み</strong>
-          <span>現在選択中の文字スロットにSVGをインポートします。</span>
+          <strong data-i18n="ed_import_single">1文字ずつ取り込み</strong>
+          <span data-i18n="ed_import_single_d">現在選択中の文字スロットにSVGをインポートします。</span>
         </button>
         <button class="modal-choice-btn" id="import-batch">
-          <strong>一括取り込み</strong>
-          <span>ファイル名からUnicodeを判定して自動で割り当てます。<br>例: A.svg, U+0041.svg</span>
+          <strong data-i18n="ed_import_batch">一括取り込み</strong>
+          <span data-i18n="ed_import_batch_d">ファイル名からUnicodeを判定して自動で割り当てます。例: A.svg, U+0041.svg</span>
         </button>
         <button class="modal-choice-btn" id="import-template">
-          <strong>テンプレートから取り込み</strong>
-          <span>テンプレートに描いた文字を自動検出して一括インポートします。</span>
+          <strong data-i18n="ed_import_template">テンプレートから取り込み</strong>
+          <span data-i18n="ed_import_template_d">テンプレートに描いた文字を自動検出して一括インポートします。</span>
         </button>
         <button class="modal-choice-btn" id="import-font-file">
-          <strong>OTF / TTF / WOFF から取り込み</strong>
-          <span>既存のフォントファイルからグリフをインポートします。</span>
+          <strong data-i18n="ed_import_font">OTF / TTF / WOFF から取り込み</strong>
+          <span data-i18n="ed_import_font_d">既存のフォントファイルからグリフをインポートします。</span>
         </button>
       </div>
     </div>
@@ -629,16 +630,16 @@ abcdefghijklmnopqrstuvwxyz
   <!-- ─── Template Dialog ────────────────────────────────────────────────── -->
   <div id="template-dialog" class="modal-overlay" style="display:none">
     <div class="modal-box">
-      <div class="modal-header">テンプレートをダウンロード<button class="close-btn" id="template-dialog-close">✕</button></div>
+      <div class="modal-header"><span data-i18n="ed_tpl_title">テンプレートをダウンロード</span><button class="close-btn" id="template-dialog-close">✕</button></div>
       <div class="modal-body">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">どちらのテンプレートをダウンロードしますか？</p>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px" data-i18n="ed_tpl_which">どちらのテンプレートをダウンロードしますか？</p>
         <button class="modal-choice-btn" id="tpl-with-ref">
-          <strong>お手本付き</strong>
-          <span>薄い参照文字付き。なぞって描けます。<br>※テキストをパスに変換しないでください</span>
+          <strong data-i18n="ed_tpl_ref">お手本付き</strong>
+          <span data-i18n="ed_tpl_ref_d">薄い参照文字付き。なぞって描けます。※テキストをパスに変換しないでください</span>
         </button>
         <button class="modal-choice-btn" id="tpl-no-ref">
-          <strong>枠のみ</strong>
-          <span>Unicode・文字ラベルのみ。自由に描けます。</span>
+          <strong data-i18n="ed_tpl_noref">枠のみ</strong>
+          <span data-i18n="ed_tpl_noref_d">Unicode・文字ラベルのみ。自由に描けます。</span>
         </button>
       </div>
     </div>
@@ -650,6 +651,7 @@ abcdefghijklmnopqrstuvwxyz
 <!-- opentype.js from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
 <!-- App scripts (order matters: path-ops first, then editor, then font-gen, then app) -->
+<script src="../js/i18n.js"></script>
 <script src="js/path-ops.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/font-gen.js"></script>
