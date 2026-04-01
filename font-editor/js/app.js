@@ -575,6 +575,17 @@ const App = {
       inp.click();
     });
 
+    document.getElementById('import-font-file')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
+      const inp = document.getElementById('font-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('font-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) this._importFontFile(file);
+    });
+
     // SVG file inputs (still needed)
     document.getElementById('svg-file-input')?.addEventListener('change', e => {
       const file = e.target.files[0];
@@ -961,14 +972,32 @@ const App = {
     // ── Settings panel ──
     document.getElementById('settings-form')?.addEventListener('submit', e => {
       e.preventDefault();
-      this.project.name = document.getElementById('s-name').value || 'MyFont';
-      this.project.style = document.getElementById('s-style').value || 'Regular';
-      this.project.description = document.getElementById('s-description').value || '';
-      this.project.copyright = document.getElementById('s-copyright').value || '';
-      this.project.license = document.getElementById('s-license').value || '';
-      this.project.author = document.getElementById('s-author').value || '';
-      this.project.authorUrl = document.getElementById('s-author-url').value || '';
-      this.project.vendorUrl = document.getElementById('s-vendor-url').value || '';
+      const gv = id => (document.getElementById(id)?.value || '');
+      this.project.name = gv('s-name') || 'MyFont';
+      this.project.nameJa = gv('s-name-ja');
+      this.project.style = gv('s-style') || 'Regular';
+      this.project.styleJa = gv('s-style-ja');
+      this.project.fullname = gv('s-fullname');
+      this.project.fullnameJa = gv('s-fullname-ja');
+      this.project.psName = gv('s-psname');
+      this.project.version = gv('s-version');
+      this.project.copyright = gv('s-copyright');
+      this.project.copyrightJa = gv('s-copyright-ja');
+      this.project.description = gv('s-description');
+      this.project.descriptionJa = gv('s-description-ja');
+      this.project.author = gv('s-author');
+      this.project.authorJa = gv('s-author-ja');
+      this.project.authorUrl = gv('s-author-url');
+      this.project.authorUrlJa = gv('s-author-url-ja');
+      this.project.vendor = gv('s-vendor');
+      this.project.vendorJa = gv('s-vendor-ja');
+      this.project.vendorUrl = gv('s-vendor-url');
+      this.project.vendorUrlJa = gv('s-vendor-url-ja');
+      this.project.license = gv('s-license');
+      this.project.licenseJa = gv('s-license-ja');
+      this.project.licenseUrl = gv('s-license-url');
+      this.project.trademark = gv('s-trademark');
+      this.project.trademarkJa = gv('s-trademark-ja');
       this.project.upm = parseInt(document.getElementById('s-upm').value) || 1000;
       this.project.ascender = parseInt(document.getElementById('s-ascender').value) || 800;
       this.project.descender = parseInt(document.getElementById('s-descender').value) || -200;
@@ -1201,13 +1230,30 @@ const App = {
   _updateSettingsForm() {
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     set('s-name', this.project.name);
+    set('s-name-ja', this.project.nameJa || '');
     set('s-style', this.project.style);
-    set('s-description', this.project.description || '');
+    set('s-style-ja', this.project.styleJa || '');
+    set('s-fullname', this.project.fullname || '');
+    set('s-fullname-ja', this.project.fullnameJa || '');
+    set('s-psname', this.project.psName || '');
+    set('s-version', this.project.version || 'Version 1.000');
     set('s-copyright', this.project.copyright || '');
-    set('s-license', this.project.license || '');
+    set('s-copyright-ja', this.project.copyrightJa || '');
+    set('s-description', this.project.description || '');
+    set('s-description-ja', this.project.descriptionJa || '');
     set('s-author', this.project.author || '');
+    set('s-author-ja', this.project.authorJa || '');
     set('s-author-url', this.project.authorUrl || '');
+    set('s-author-url-ja', this.project.authorUrlJa || '');
+    set('s-vendor', this.project.vendor || '');
+    set('s-vendor-ja', this.project.vendorJa || '');
     set('s-vendor-url', this.project.vendorUrl || '');
+    set('s-vendor-url-ja', this.project.vendorUrlJa || '');
+    set('s-license', this.project.license || '');
+    set('s-license-ja', this.project.licenseJa || '');
+    set('s-license-url', this.project.licenseUrl || '');
+    set('s-trademark', this.project.trademark || '');
+    set('s-trademark-ja', this.project.trademarkJa || '');
     set('s-upm', this.project.upm);
     set('s-ascender', this.project.ascender);
     set('s-descender', this.project.descender);
@@ -1270,6 +1316,63 @@ const App = {
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
+  },
+
+  // ─── OTF/TTF Import ────────────────────────────────────────────────────────────
+
+  _importFontFile(file) {
+    if (typeof opentype === 'undefined') {
+      this._notify('opentype.js が読み込まれていません', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const font = opentype.parse(e.target.result);
+        let count = 0;
+        for (let i = 0; i < font.glyphs.length; i++) {
+          const g = font.glyphs.get(i);
+          if (!g.unicode || g.unicode === 0) continue;
+          const path = g.path;
+          if (!path || !path.commands || !path.commands.length) continue;
+          const cmds = [];
+          for (const c of path.commands) {
+            if (c.type === 'M') cmds.push({ type: 'M', x: c.x, y: c.y });
+            else if (c.type === 'L') cmds.push({ type: 'L', x: c.x, y: c.y });
+            else if (c.type === 'C') cmds.push({ type: 'C', cp1x: c.x1, cp1y: c.y1, cp2x: c.x2, cp2y: c.y2, x: c.x, y: c.y });
+            else if (c.type === 'Q') {
+              // Convert quadratic to cubic
+              const prevCmd = cmds.length > 0 ? cmds[cmds.length - 1] : null;
+              const px = prevCmd ? (prevCmd.x || 0) : 0;
+              const py = prevCmd ? (prevCmd.y || 0) : 0;
+              cmds.push({ type: 'C',
+                cp1x: px + (2/3) * (c.x1 - px), cp1y: py + (2/3) * (c.y1 - py),
+                cp2x: c.x + (2/3) * (c.x1 - c.x), cp2y: c.y + (2/3) * (c.y1 - c.y),
+                x: c.x, y: c.y });
+            }
+            else if (c.type === 'Z') cmds.push({ type: 'Z' });
+          }
+          if (!cmds.length) continue;
+          this.project.glyphs[g.unicode] = {
+            unicode: g.unicode,
+            char: String.fromCodePoint(g.unicode),
+            advanceWidth: g.advanceWidth || 600,
+            pathData: cmds,
+          };
+          count++;
+        }
+        this._refreshGlyphGrid();
+        if (this.currentUnicode != null && this.project.glyphs[this.currentUnicode]) {
+          this.editor.loadGlyph(this.project.glyphs[this.currentUnicode]);
+          document.getElementById('advance-width').value = this.project.glyphs[this.currentUnicode].advanceWidth;
+        }
+        this._notify(`${count}グリフをフォントからインポートしました`);
+      } catch (err) {
+        console.error(err);
+        this._notify('フォントの読み込みに失敗: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
   },
 
   // ─── Side Bearings ────────────────────────────────────────────────────────────

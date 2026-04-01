@@ -66,8 +66,9 @@
   </header>
 
   <!-- ─── Hidden file inputs ────────────────────────────────────────────── -->
-  <input type="file" id="svg-file-input" accept=".svg,image/svg+xml" class="hidden-input">
+  <input type="file" id="svg-file-input" accept=".svg,.otf,.ttf,.woff,image/svg+xml,font/otf,font/ttf" class="hidden-input">
   <input type="file" id="batch-file-input" accept=".svg,image/svg+xml" multiple class="hidden-input">
+  <input type="file" id="font-file-input" accept=".otf,.ttf,.woff" class="hidden-input">
   <input type="file" id="load-file-input" accept=".fontproj,.json" class="hidden-input">
 
   <!-- ─── Main body ──────────────────────────────────────────────────────── -->
@@ -493,84 +494,110 @@ abcdefghijklmnopqrstuvwxyz
     </div>
     <div id="settings-panel-body">
       <form id="settings-form">
-        <div class="section-hdr">メタデータ</div>
-        <div class="settings-field">
-          <label>フォント名</label>
-          <input type="text" id="s-name" value="MyFont" required>
-        </div>
-        <div class="settings-field">
-          <label>スタイル</label>
-          <select id="s-style">
-            <option value="Regular">Regular</option>
-            <option value="Bold">Bold</option>
-            <option value="Italic">Italic</option>
-            <option value="Bold Italic">Bold Italic</option>
-            <option value="Light">Light</option>
-            <option value="Medium">Medium</option>
-            <option value="SemiBold">SemiBold</option>
-            <option value="ExtraBold">ExtraBold</option>
-            <option value="Thin">Thin</option>
-          </select>
-        </div>
-        <div class="settings-field">
-          <label>説明文 (Description)</label>
-          <textarea id="s-description" rows="2" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:4px;font-size:12px;resize:vertical"></textarea>
-        </div>
-        <div class="settings-field">
-          <label>著作権 (Copyright)</label>
-          <input type="text" id="s-copyright" value="">
-        </div>
-        <div class="settings-field">
-          <label>ライセンス (License)</label>
-          <input type="text" id="s-license" value="">
-        </div>
-        <div class="settings-field">
-          <label>作者 (Author)</label>
-          <input type="text" id="s-author" value="">
-        </div>
-        <div class="settings-field">
-          <label>作者URL (Author URL)</label>
-          <input type="text" id="s-author-url" value="">
-        </div>
-        <div class="settings-field">
-          <label>ベンダーURL (Vendor URL)</label>
-          <input type="text" id="s-vendor-url" value="">
+        <div class="section-hdr">基本情報</div>
+
+        <div class="s-label">フォントファミリー名</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-name" value="MyFont" required></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-name-ja" value=""></div>
         </div>
 
-        <div class="section-hdr">フォントメトリクス</div>
+        <div class="s-label">スタイル名</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label>
+            <select id="s-style">
+              <option value="Regular">Regular</option>
+              <option value="Bold">Bold</option>
+              <option value="Italic">Italic</option>
+              <option value="Bold Italic">Bold Italic</option>
+              <option value="Light">Light</option>
+              <option value="Medium">Medium</option>
+              <option value="SemiBold">SemiBold</option>
+              <option value="ExtraBold">ExtraBold</option>
+              <option value="Thin">Thin</option>
+            </select>
+          </div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-style-ja" value=""></div>
+        </div>
+
+        <div class="s-label">フルネーム</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-fullname" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-fullname-ja" value=""></div>
+        </div>
+
+        <div class="s-label">PostScript名</div>
+        <div class="settings-field"><input type="text" id="s-psname" value=""></div>
+
+        <div class="s-label">バージョン</div>
+        <div class="settings-field"><input type="text" id="s-version" value="Version 1.000"></div>
+
+        <div class="s-label">著作権</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-copyright" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-copyright-ja" value=""></div>
+        </div>
+
+        <div class="s-label">説明</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-description" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-description-ja" value=""></div>
+        </div>
+
+        <div class="s-label">デザイナー</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-author" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-author-ja" value=""></div>
+        </div>
+
+        <div class="s-label">デザイナーURL</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-author-url" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-author-url-ja" value=""></div>
+        </div>
+
+        <div class="s-label">メーカー</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-vendor" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-vendor-ja" value=""></div>
+        </div>
+
+        <div class="s-label">メーカーURL</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-vendor-url" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-vendor-url-ja" value=""></div>
+        </div>
+
+        <div class="s-label">ライセンス</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-license" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-license-ja" value=""></div>
+        </div>
+
+        <div class="s-label">ライセンスURL</div>
+        <div class="settings-field"><input type="text" id="s-license-url" value=""></div>
+
+        <div class="s-label">商標</div>
+        <div class="s-row2">
+          <div class="settings-field"><label>英語</label><input type="text" id="s-trademark" value=""></div>
+          <div class="settings-field"><label>日本語</label><input type="text" id="s-trademark-ja" value=""></div>
+        </div>
+
+        <div class="section-hdr">メトリクス設定</div>
         <div class="settings-grid">
-          <div class="settings-field">
-            <label>UPM</label>
-            <input type="number" id="s-upm" value="1000" min="100" max="4096">
-          </div>
-          <div class="settings-field">
-            <label>アセンダ</label>
-            <input type="number" id="s-ascender" value="800">
-          </div>
-          <div class="settings-field">
-            <label>ディセンダ</label>
-            <input type="number" id="s-descender" value="-200">
-          </div>
-          <div class="settings-field">
-            <label>大文字高</label>
-            <input type="number" id="s-capheight" value="700">
-          </div>
-          <div class="settings-field">
-            <label>x字高</label>
-            <input type="number" id="s-xheight" value="500">
-          </div>
+          <div class="settings-field"><label>UPM (解像度)</label><input type="number" id="s-upm" value="1000" min="100" max="4096"></div>
+          <div class="settings-field"><label>Ascender (上端)</label><input type="number" id="s-ascender" value="800"></div>
+          <div class="settings-field"><label>Descender (下端)</label><input type="number" id="s-descender" value="-200"></div>
+        </div>
+        <div class="settings-grid">
+          <div class="settings-field"><label>大文字高</label><input type="number" id="s-capheight" value="700"></div>
+          <div class="settings-field"><label>x字高</label><input type="number" id="s-xheight" value="500"></div>
         </div>
 
         <div class="section-hdr">デフォルト字間</div>
         <div class="settings-grid">
-          <div class="settings-field">
-            <label>左 LSB</label>
-            <input type="number" id="s-lsb" value="50" min="0">
-          </div>
-          <div class="settings-field">
-            <label>右 RSB</label>
-            <input type="number" id="s-rsb" value="50" min="0">
-          </div>
+          <div class="settings-field"><label>左 LSB</label><input type="number" id="s-lsb" value="50" min="0"></div>
+          <div class="settings-field"><label>右 RSB</label><input type="number" id="s-rsb" value="50" min="0"></div>
         </div>
 
         <button type="submit" class="settings-submit">保存</button>
@@ -594,6 +621,10 @@ abcdefghijklmnopqrstuvwxyz
         <button class="modal-choice-btn" id="import-template">
           <strong>テンプレートから取り込み</strong>
           <span>テンプレートに描いた文字を自動検出して一括インポートします。</span>
+        </button>
+        <button class="modal-choice-btn" id="import-font-file">
+          <strong>OTF / TTF / WOFF から取り込み</strong>
+          <span>既存のフォントファイルからグリフをインポートします。</span>
         </button>
       </div>
     </div>

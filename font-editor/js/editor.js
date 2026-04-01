@@ -248,7 +248,7 @@ class GlyphEditor {
     const rawSize = upm || fontH;
     let sizeMul, nudgePct;
     if (this.referenceFont === 'monospace') {
-      sizeMul = 0.91;
+      sizeMul = 0.87;
       nudgePct = -0.02; // slightly up
     } else if (this.referenceFont === 'sans-serif') {
       sizeMul = 0.96;

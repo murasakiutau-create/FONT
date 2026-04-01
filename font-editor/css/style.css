@@ -306,7 +306,7 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
 
 /* ─── Settings Panel (slide-in) ─────────────────────────────────────────── */
 #settings-panel {
-  position: fixed; right: -320px; top: 0; bottom: 0; width: 310px; z-index: 200;
+  position: fixed; right: -480px; top: 0; bottom: 0; width: 460px; z-index: 200;
   background: var(--bg2); border-left: 1px solid var(--border);
   display: flex; flex-direction: column;
   transition: right 0.25s cubic-bezier(0.4,0,0.2,1);
@@ -334,6 +334,8 @@ input, button, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .settings-field input:focus { outline: none; border-color: var(--accent); }
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.s-label { font-size: 12px; font-weight: 700; color: #000; margin: 10px 0 4px; }
+.s-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .settings-grid .settings-field { margin-bottom: 0; }
 .settings-submit {
   width: 100%; padding: 8px; background: #000; color: #fff;
