@@ -26,7 +26,7 @@ class GlyphEditor {
     this.selectedNode = -1;   // index within subpath
     this.selectedHandle = null; // {nodeIdx, side: 'cp1'|'cp2'}
     this.showReference = true;
-    this.referenceFont = 'serif';
+    this.referenceFont = 'sans-serif';
     this.showHandles = true;
     this.dragState = null;
     this.customGuides = [];   // array of Y values for custom guidelines
@@ -227,12 +227,22 @@ class GlyphEditor {
     const fontH = ascender - descender;
     const aw = this.glyph.advanceWidth || 600;
 
-    // Per-font tuning: serif fonts need different size/nudge than sans-serif
-    const isSerif = /serif|Georgia|Times|Courier/i.test(this.referenceFont) && !/sans/i.test(this.referenceFont);
-    const sizeMul = isSerif ? 0.98 : 1.0;
-    const nudgePct = isSerif ? 0.03 : 0.0;
+    // Per-font tuning for size and baseline nudge
+    const rawSize = upm || fontH;
+    let sizeMul, nudgePct;
+    if (this.referenceFont === 'monospace') {
+      sizeMul = 0.93;
+      nudgePct = -0.01; // slightly up
+    } else if (this.referenceFont === 'sans-serif') {
+      sizeMul = 0.95;
+      nudgePct = 0.0;
+    } else {
+      // serif
+      sizeMul = 0.98;
+      nudgePct = 0.03;
+    }
 
-    const adjustedSize = (upm || fontH) * sizeMul;
+    const adjustedSize = rawSize * sizeMul;
     const nudge = adjustedSize * nudgePct;
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     text.setAttribute('transform', `translate(${aw / 2}, ${-nudge}) scale(1, -1)`);
