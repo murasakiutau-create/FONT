@@ -398,7 +398,7 @@ class GlyphEditor {
     this.svg.addEventListener('mouseup', e => this._onMouseup(e));
     this.svg.addEventListener('wheel', e => this._onWheel(e), { passive: false });
     this.svg.addEventListener('dblclick', e => this._onDblclick(e));
-    this.svg.addEventListener('contextmenu', e => e.preventDefault());
+    this.svg.addEventListener('contextmenu', e => this._onContextMenu(e));
     // Escape to finalize pen path
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && this.editMode === 'pen' && this.penState) {
@@ -716,6 +716,84 @@ class GlyphEditor {
     this.panY += sy - ns.y;
     this._updateTransform(); this._renderGrid(); this.render();
     if (this.options.onZoomChange) this.options.onZoomChange(this.zoom);
+  }
+
+  _onContextMenu(e) {
+    e.preventDefault();
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    // Check if right-clicking on a node
+    const target = e.target;
+    const cmdAttr = target.getAttribute('data-cmd');
+    if (cmdAttr == null) return;
+    const cmdIdx = parseInt(cmdAttr);
+    const cmd = this.glyph.pathData[cmdIdx];
+    if (!cmd) return;
+
+    // Show context menu
+    this._showNodeContextMenu(e.clientX, e.clientY, cmdIdx, cmd);
+  }
+
+  _showNodeContextMenu(x, y, cmdIdx, cmd) {
+    // Remove existing menu
+    const old = document.getElementById('node-ctx-menu');
+    if (old) old.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'node-ctx-menu';
+    menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:9999;background:#fff;border:2px solid #000;border-radius:6px;padding:4px 0;min-width:160px;box-shadow:2px 2px 8px rgba(0,0,0,0.2);font-size:12px`;
+
+    const addItem = (label, fn) => {
+      const item = document.createElement('div');
+      item.textContent = label;
+      item.style.cssText = 'padding:6px 14px;cursor:pointer;color:#000';
+      item.addEventListener('mouseenter', () => item.style.background = '#f0f0f0');
+      item.addEventListener('mouseleave', () => item.style.background = 'none');
+      item.addEventListener('click', () => { menu.remove(); fn(); });
+      menu.appendChild(item);
+    };
+
+    if (cmd.type === 'L') {
+      addItem('→ ベジェ曲線に変換 (ハンドル追加)', () => this._convertToCurve(cmdIdx));
+    } else if (cmd.type === 'C') {
+      addItem('→ 直線に変換 (ハンドル削除)', () => this._convertToLine(cmdIdx));
+    }
+    addItem('ノードを削除', () => { this.selectedNode = cmdIdx; this.deleteSelectedNode(); });
+
+    document.body.appendChild(menu);
+    // Close on click outside
+    const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', close); } };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+  }
+
+  _convertToCurve(cmdIdx) {
+    const cmds = this.glyph.pathData;
+    const c = cmds[cmdIdx];
+    if (!c || c.type !== 'L') return;
+    // Find previous point
+    let prevX = 0, prevY = 0;
+    for (let i = cmdIdx - 1; i >= 0; i--) {
+      if (cmds[i].type === 'M' || cmds[i].type === 'L' || cmds[i].type === 'C') {
+        prevX = cmds[i].x; prevY = cmds[i].y; break;
+      }
+    }
+    // Convert L to C with handles at 1/3 and 2/3 of the line
+    cmds[cmdIdx] = {
+      type: 'C',
+      cp1x: prevX + (c.x - prevX) / 3,
+      cp1y: prevY + (c.y - prevY) / 3,
+      cp2x: prevX + 2 * (c.x - prevX) / 3,
+      cp2y: prevY + 2 * (c.y - prevY) / 3,
+      x: c.x, y: c.y,
+    };
+    this.render(); this._notifyChange();
+  }
+
+  _convertToLine(cmdIdx) {
+    const cmds = this.glyph.pathData;
+    const c = cmds[cmdIdx];
+    if (!c || c.type !== 'C') return;
+    cmds[cmdIdx] = { type: 'L', x: c.x, y: c.y };
+    this.render(); this._notifyChange();
   }
 
   _onDblclick(e) {
