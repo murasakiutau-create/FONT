@@ -348,19 +348,30 @@ class GlyphEditor {
         nodeIdx++;
       }
 
-      // Draw handle lines first
+      // Draw handle lines and circles
       if (this.showHandles) {
         for (const p of pts) {
           if (p.type === 'handle') {
+            // Always draw the handle line
             const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#888', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
             this.nodesLayer.appendChild(line);
           }
         }
-        // Draw handle circles
         for (const p of pts) {
           if (p.type === 'handle') {
             const isSel = this.selectedHandle && this.selectedHandle.cmdIdx === p.cmdIdx && this.selectedHandle.side === p.side;
-            const circle = this._el('circle', { cx: p.hx, cy: p.hy, r: hR, fill: 'none', stroke: isSel ? '#000' : '#888', 'stroke-width': sw, cursor: 'move', 'data-cmd': p.cmdIdx, 'data-side': p.side });
+            // If handle overlaps anchor, offset slightly so it's still visible & draggable
+            let hx = p.hx, hy = p.hy;
+            const dist = Math.hypot(hx - p.ax, hy - p.ay);
+            const minDist = 4 / this.zoom;
+            const isCollapsed = dist < minDist;
+            const circle = this._el('circle', {
+              cx: hx, cy: hy, r: isCollapsed ? hR * 1.5 : hR,
+              fill: isCollapsed ? '#c07070' : 'none',
+              stroke: isSel ? '#000' : '#888',
+              'stroke-width': sw, cursor: 'move',
+              'data-cmd': p.cmdIdx, 'data-side': p.side,
+            });
             circle.addEventListener('mousedown', e => this._handleHandleMousedown(e, p.cmdIdx, p.side));
             this.nodesLayer.appendChild(circle);
           }
