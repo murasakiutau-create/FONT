@@ -16,62 +16,112 @@ body {
   align-items: center;
   padding: 20px;
 }
-h1 { font-size: 1.4em; margin-bottom: 8px; color: #fff; }
+h1 { font-size: 1.4em; margin-bottom: 4px; color: #fff; }
 .subtitle { font-size: 0.85em; color: #888; margin-bottom: 20px; }
-.controls {
+
+.settings {
   display: flex; gap: 16px; align-items: center;
   margin-bottom: 20px; flex-wrap: wrap; justify-content: center;
 }
-.controls label { font-size: 0.9em; color: #aaa; }
-.controls select, .controls input[type="color"] {
+.settings label { font-size: 0.9em; color: #aaa; }
+.settings select, .settings input[type="color"] {
   background: #2a2a4a; color: #fff; border: 1px solid #444;
   padding: 6px 10px; border-radius: 6px; font-size: 0.9em;
 }
-.controls input[type="color"] { width: 40px; height: 32px; padding: 2px; cursor: pointer; }
-.controls input[type="checkbox"] { margin-right: 4px; }
-.drop-zone {
-  width: 320px; height: 200px; border: 2px dashed #555;
-  border-radius: 12px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; cursor: pointer;
-  transition: all 0.2s; margin-bottom: 20px; background: #16213e;
+.settings input[type="color"] { width: 40px; height: 32px; padding: 2px; cursor: pointer; }
+.settings input[type="checkbox"] { margin-right: 4px; }
+
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+  max-width: 420px;
+  width: 100%;
 }
-.drop-zone:hover, .drop-zone.dragover { border-color: #4fc3f7; background: #1a2744; }
-.drop-zone .icon { font-size: 2.5em; margin-bottom: 8px; }
-.drop-zone p { font-size: 0.9em; color: #888; }
-.drop-zone p.main-text { color: #ccc; font-size: 1em; margin-bottom: 4px; }
+.input-slot {
+  background: #16213e;
+  border: 2px dashed #444;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 12px;
+  min-height: 140px;
+  position: relative;
+}
+.input-slot:hover { border-color: #4fc3f7; background: #1a2744; }
+.input-slot.filled { border-style: solid; border-color: #4fc3f7; }
+.input-slot .direction { font-size: 0.85em; color: #aaa; margin-bottom: 6px; font-weight: bold; }
+.input-slot .icon { font-size: 1.8em; margin-bottom: 4px; }
+.input-slot .hint { font-size: 0.75em; color: #666; }
+.input-slot canvas {
+  image-rendering: pixelated;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#333 0% 25%, #252 0% 50%) 50% / 10px 10px;
+}
+.input-slot .remove-btn {
+  position: absolute; top: 4px; right: 8px;
+  background: none; border: none; color: #f55; font-size: 1.1em;
+  cursor: pointer; display: none;
+}
+.input-slot.filled .remove-btn { display: block; }
 input[type="file"] { display: none; }
-.preview-area {
-  display: flex; gap: 30px; flex-wrap: wrap;
-  justify-content: center; align-items: flex-start; margin-bottom: 20px;
+
+.divider {
+  width: 100%; max-width: 500px; border-top: 1px solid #333;
+  margin: 8px 0 20px;
 }
-.preview-box { text-align: center; }
-.preview-box h3 { font-size: 0.85em; color: #888; margin-bottom: 8px; }
-.preview-box canvas {
-  border: 1px solid #333; border-radius: 4px;
-  image-rendering: pixelated; background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 16px 16px;
+
+.result-section { text-align: center; margin-bottom: 20px; }
+.result-section h2 { font-size: 1.1em; color: #ccc; margin-bottom: 12px; }
+.result-section canvas {
+  image-rendering: pixelated;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 16px 16px;
 }
-.result-area { text-align: center; }
-.btn {
-  background: #4fc3f7; color: #111; border: none;
-  padding: 10px 24px; border-radius: 8px; font-size: 1em;
-  font-weight: bold; cursor: pointer; transition: background 0.2s; margin-top: 12px;
+.result-flex {
+  display: flex; align-items: stretch; justify-content: center; gap: 4px;
 }
-.btn:hover { background: #81d4fa; }
-.btn:disabled { background: #444; color: #777; cursor: not-allowed; }
-.info { font-size: 0.8em; color: #666; margin-top: 16px; text-align: center; max-width: 550px; }
 .row-labels {
   display: flex; flex-direction: column; justify-content: space-around;
-  font-size: 0.75em; color: #888; padding: 20px 0;
+  font-size: 0.75em; color: #888;
 }
-.note { font-size: 0.8em; color: #f0ad4e; margin-top: 10px; max-width: 550px; text-align: center; }
+.btn {
+  background: #4fc3f7; color: #111; border: none;
+  padding: 10px 28px; border-radius: 8px; font-size: 1em;
+  font-weight: bold; cursor: pointer; transition: background 0.2s; margin-top: 14px;
+}
+.btn:hover { background: #81d4fa; }
+.btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+.anim-preview {
+  display: flex; gap: 24px; justify-content: center;
+  flex-wrap: wrap; margin-top: 16px; margin-bottom: 16px;
+}
+.anim-box { text-align: center; }
+.anim-box .label { font-size: 0.75em; color: #888; margin-bottom: 4px; }
+.anim-box canvas {
+  image-rendering: pixelated; border-radius: 4px;
+  background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 10px 10px;
+}
+
+.info {
+  font-size: 0.8em; color: #666; margin-top: 16px;
+  text-align: center; max-width: 550px;
+}
 </style>
 </head>
 <body>
 
 <h1>RPGツクール スプライトシート生成ツール</h1>
-<p class="subtitle">正面画像1枚から 3x4 スプライトシートを自動生成</p>
+<p class="subtitle">4方向の立ち絵から歩行アニメーション付きスプライトシートを生成</p>
 
-<div class="controls">
+<div class="settings">
   <label>セルサイズ:
     <select id="cellSize">
       <option value="32">32x32</option>
@@ -96,219 +146,279 @@ input[type="file"] { display: none; }
   </label>
 </div>
 
-<div class="drop-zone" id="dropZone">
-  <div class="icon">📁</div>
-  <p class="main-text">画像をドラッグ＆ドロップ</p>
-  <p>またはクリックして選択</p>
+<div class="input-grid">
+  <div class="input-slot" data-dir="down" id="slot-down">
+    <button class="remove-btn" title="削除">&times;</button>
+    <span class="direction">正面（下）</span>
+    <span class="icon">⬇️</span>
+    <span class="hint">クリックして画像を選択</span>
+  </div>
+  <div class="input-slot" data-dir="left" id="slot-left">
+    <button class="remove-btn" title="削除">&times;</button>
+    <span class="direction">左向き</span>
+    <span class="icon">⬅️</span>
+    <span class="hint">クリックして画像を選択</span>
+  </div>
+  <div class="input-slot" data-dir="right" id="slot-right">
+    <button class="remove-btn" title="削除">&times;</button>
+    <span class="direction">右向き</span>
+    <span class="icon">➡️</span>
+    <span class="hint">クリックして画像を選択</span>
+  </div>
+  <div class="input-slot" data-dir="up" id="slot-up">
+    <button class="remove-btn" title="削除">&times;</button>
+    <span class="direction">後ろ（上）</span>
+    <span class="icon">⬆️</span>
+    <span class="hint">クリックして画像を選択</span>
+  </div>
 </div>
+
 <input type="file" id="fileInput" accept="image/*">
 
-<div class="preview-area" id="previewArea" style="display:none;">
-  <div class="preview-box">
-    <h3>入力画像（背景除去後）</h3>
-    <canvas id="inputPreview"></canvas>
-  </div>
-  <div class="preview-box">
-    <h3>スプライトシート</h3>
-    <div style="display:flex; align-items:stretch;">
-      <div class="row-labels">
-        <span>正面 ↓</span>
-        <span>左 ←</span>
-        <span>右 →</span>
-        <span>後ろ ↑</span>
-      </div>
-      <canvas id="sheetPreview"></canvas>
-    </div>
-  </div>
-</div>
+<div class="divider"></div>
 
-<div class="result-area" id="resultArea" style="display:none;">
+<div class="result-section" id="resultSection" style="display:none;">
+  <h2>歩行アニメーション プレビュー</h2>
+  <div class="anim-preview" id="animPreview"></div>
+
+  <h2>スプライトシート</h2>
+  <div class="result-flex">
+    <div class="row-labels" id="rowLabels"></div>
+    <canvas id="sheetCanvas"></canvas>
+  </div>
+  <br>
   <button class="btn" id="downloadBtn">ダウンロード (.png)</button>
 </div>
 
-<p class="note" id="bgNote" style="display:none;">
-  背景色が自動検出されました。うまくいかない場合は「背景色」を手動で選択してください。
-</p>
-
 <p class="info">
+  4方向すべて入力しなくてもOK（入力した方向だけ生成されます）<br>
   対応形式: PNG / JPG / GIF / WebP（透過PNG推奨）<br>
-  出力: RPGツクール標準 3列x4行（正面・左・右・後ろ × 歩行左・立ち・歩行右）<br>
-  ※ 横向き・後ろ向きは正面画像からの近似生成です
+  出力: RPGツクール標準 3列（歩行左・立ち・歩行右）
 </p>
 
 <script>
+// --- State ---
+const images = { down: null, left: null, right: null, up: null };
+let activeSlot = null;
+let sheetDataURL = null;
+let animTimers = [];
+
 const $ = id => document.getElementById(id);
-const dropZone = $('dropZone'), fileInput = $('fileInput');
-const cellSizeSelect = $('cellSize'), autoBgCheck = $('autoBg');
-const bgColorInput = $('bgColor'), bgToleranceSelect = $('bgTolerance');
-const previewArea = $('previewArea'), resultArea = $('resultArea');
-const downloadBtn = $('downloadBtn'), bgNote = $('bgNote');
-const inputPreview = $('inputPreview'), sheetPreview = $('sheetPreview');
+const fileInput = $('fileInput');
 
-let currentImage = null, sheetDataURL = null;
-
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault(); dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+// --- Slot click / file handling ---
+document.querySelectorAll('.input-slot').forEach(slot => {
+  slot.addEventListener('click', e => {
+    if (e.target.classList.contains('remove-btn')) return;
+    activeSlot = slot.dataset.dir;
+    fileInput.click();
+  });
+  slot.querySelector('.remove-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    images[slot.dataset.dir] = null;
+    resetSlot(slot);
+    generateIfAny();
+  });
+  // ドラッグ＆ドロップ（各スロット）
+  slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('dragover'); });
+  slot.addEventListener('dragleave', () => slot.classList.remove('dragover'));
+  slot.addEventListener('drop', e => {
+    e.preventDefault(); slot.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      activeSlot = slot.dataset.dir;
+      loadFile(e.dataTransfer.files[0]);
+    }
+  });
 });
-fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
-[cellSizeSelect, autoBgCheck, bgColorInput, bgToleranceSelect].forEach(el =>
-  el.addEventListener('change', () => { if (currentImage) generate(); })
-);
 
-function handleFile(file) {
-  if (!file.type.startsWith('image/')) { alert('画像ファイルを選択してください'); return; }
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length && activeSlot) loadFile(e.target.files[0]);
+  fileInput.value = '';
+});
+
+function loadFile(file) {
+  if (!file.type.startsWith('image/')) return;
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
-    img.onload = () => { currentImage = img; generate(); };
+    img.onload = () => {
+      images[activeSlot] = img;
+      showSlotPreview(activeSlot, img);
+      generateIfAny();
+    };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function newCanvas(w, h) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  return c;
+function resetSlot(slot) {
+  slot.classList.remove('filled');
+  const existing = slot.querySelector('canvas');
+  if (existing) existing.remove();
+  slot.querySelector('.icon').style.display = '';
+  slot.querySelector('.hint').style.display = '';
 }
 
-function getPixels(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height); }
-function putPixels(c, d) { c.getContext('2d').putImageData(d, 0, 0); }
+function showSlotPreview(dir, img) {
+  const slot = $('slot-' + dir);
+  slot.classList.add('filled');
+  slot.querySelector('.icon').style.display = 'none';
+  slot.querySelector('.hint').style.display = 'none';
+  const existing = slot.querySelector('canvas');
+  if (existing) existing.remove();
 
+  const size = 80;
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // 処理済み画像をプレビュー
+  const processed = processInput(img, parseInt($('cellSize').value));
+  ctx.drawImage(processed, 0, 0, size, size);
+  slot.appendChild(c);
+}
+
+// --- Settings change ---
+[$('cellSize'), $('autoBg'), $('bgColor'), $('bgTolerance')].forEach(el =>
+  el.addEventListener('change', () => {
+    // プレビュー更新
+    for (const dir of ['down', 'left', 'right', 'up']) {
+      if (images[dir]) showSlotPreview(dir, images[dir]);
+    }
+    generateIfAny();
+  })
+);
+
+// --- Canvas helpers ---
+function newCanvas(w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+}
+function getPixels(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height); }
 function fromImageData(d) {
   const c = newCanvas(d.width, d.height);
-  putPixels(c, d); return c;
+  c.getContext('2d').putImageData(d, 0, 0); return c;
 }
 
-function cloneCanvas(src) {
-  const c = newCanvas(src.width, src.height);
-  c.getContext('2d').drawImage(src, 0, 0);
-  return c;
-}
-
-// --- 背景除去 ---
-
+// --- Background removal ---
 function detectBgColor(canvas) {
   const d = getPixels(canvas).data;
   const w = canvas.width, h = canvas.height;
-  // 四隅のピクセルからもっとも多い色を取得
   const corners = [];
   for (let dy = 0; dy < 3; dy++) {
     for (let dx = 0; dx < 3; dx++) {
-      corners.push([dx, dy]);
-      corners.push([w - 1 - dx, dy]);
-      corners.push([dx, h - 1 - dy]);
-      corners.push([w - 1 - dx, h - 1 - dy]);
+      corners.push([dx, dy], [w-1-dx, dy], [dx, h-1-dy], [w-1-dx, h-1-dy]);
     }
   }
-  const colorCount = {};
+  const counts = {};
   corners.forEach(([x, y]) => {
     const i = (y * w + x) * 4;
-    const key = `${d[i]},${d[i+1]},${d[i+2]}`;
-    colorCount[key] = (colorCount[key] || 0) + 1;
+    const k = `${d[i]},${d[i+1]},${d[i+2]}`;
+    counts[k] = (counts[k] || 0) + 1;
   });
-  let best = null, bestCount = 0;
-  for (const [key, count] of Object.entries(colorCount)) {
-    if (count > bestCount) { best = key; bestCount = count; }
-  }
-  const [r, g, b] = best.split(',').map(Number);
-  return [r, g, b];
+  let best = '255,255,255', bestN = 0;
+  for (const [k, n] of Object.entries(counts)) { if (n > bestN) { best = k; bestN = n; } }
+  return best.split(',').map(Number);
 }
 
-function removeBg(canvas, bgR, bgG, bgB, tolerance) {
+function removeBg(canvas, bgR, bgG, bgB, tol) {
   const id = getPixels(canvas);
   const d = id.data;
   for (let i = 0; i < d.length; i += 4) {
-    const dr = d[i] - bgR, dg = d[i+1] - bgG, db = d[i+2] - bgB;
+    const dr = d[i]-bgR, dg = d[i+1]-bgG, db = d[i+2]-bgB;
     const dist = Math.sqrt(dr*dr + dg*dg + db*db);
-    if (dist < tolerance) {
-      d[i+3] = 0; // 透明にする
-    } else if (dist < tolerance * 1.5) {
-      // エッジを半透明にしてなめらかに
-      const alpha = Math.min(255, Math.round((dist - tolerance) / (tolerance * 0.5) * 255));
-      d[i+3] = Math.min(d[i+3], alpha);
-    }
+    if (dist < tol) { d[i+3] = 0; }
+    else if (dist < tol * 1.5) { d[i+3] = Math.min(d[i+3], Math.round((dist-tol)/(tol*0.5)*255)); }
   }
   return fromImageData(id);
 }
 
-// --- キャラクターの境界ボックス検出 ---
-
-function findCharBounds(canvas) {
+// --- Bounding & center ---
+function findBounds(canvas) {
   const d = getPixels(canvas).data;
   const w = canvas.width, h = canvas.height;
-  let minX = w, maxX = 0, minY = h, maxY = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (d[(y * w + x) * 4 + 3] > 32) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
+  let x0 = w, x1 = 0, y0 = h, y1 = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y*w+x)*4+3] > 32) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
   }
-  return { minX, maxX, minY, maxY };
+  return { x0, x1, y0, y1 };
 }
 
-// キャラクターを中央に配置してセルサイズに合わせる
-function centerCharacter(canvas, size) {
-  const bounds = findCharBounds(canvas);
-  if (bounds.minX > bounds.maxX) return newCanvas(size, size); // 空
-
-  const charW = bounds.maxX - bounds.minX + 1;
-  const charH = bounds.maxY - bounds.minY + 1;
-
-  // セルに収まるようにスケール（少し余白を残す）
-  const margin = Math.max(1, Math.floor(size * 0.05));
-  const available = size - margin * 2;
-  const scale = Math.min(available / charW, available / charH, 1);
-
-  const scaledW = Math.round(charW * scale);
-  const scaledH = Math.round(charH * scale);
-
+function centerInCell(canvas, size) {
+  const b = findBounds(canvas);
+  if (b.x0 > b.x1) return newCanvas(size, size);
+  const cw = b.x1 - b.x0 + 1, ch = b.y1 - b.y0 + 1;
+  const margin = Math.max(1, Math.floor(size * 0.04));
+  const avail = size - margin * 2;
+  const scale = Math.min(avail / cw, avail / ch, 1);
+  const sw = Math.round(cw * scale), sh = Math.round(ch * scale);
   const c = newCanvas(size, size);
   const ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  const dx = Math.floor((size - scaledW) / 2);
-  const dy = size - scaledH - margin; // 足元を下揃え
-  ctx.drawImage(canvas, bounds.minX, bounds.minY, charW, charH, dx, dy, scaledW, scaledH);
+  ctx.drawImage(canvas, b.x0, b.y0, cw, ch,
+    Math.floor((size - sw) / 2), size - sh - margin, sw, sh);
   return c;
 }
 
-// --- 歩行アニメーション ---
+// --- Input processing pipeline ---
+function processInput(img, size) {
+  let raw = newCanvas(img.width, img.height);
+  raw.getContext('2d').drawImage(img, 0, 0);
 
+  // 既に透過がある画像かチェック
+  const rawData = getPixels(raw).data;
+  let hasTransparency = false;
+  for (let i = 3; i < rawData.length; i += 4) {
+    if (rawData[i] < 250) { hasTransparency = true; break; }
+  }
+
+  let processed = raw;
+  if (!hasTransparency) {
+    const tol = parseInt($('bgTolerance').value);
+    if ($('autoBg').checked) {
+      const [r, g, b] = detectBgColor(raw);
+      processed = removeBg(raw, r, g, b, tol);
+    } else {
+      const hex = $('bgColor').value;
+      processed = removeBg(raw,
+        parseInt(hex.substr(1,2),16),
+        parseInt(hex.substr(3,2),16),
+        parseInt(hex.substr(5,2),16), tol);
+    }
+  }
+  return centerInCell(processed, size);
+}
+
+// --- Walk animation ---
 function makeWalkFrame(standing, direction, size) {
-  // direction: -1=左足前, +1=右足前
+  // direction: -1 = 左足前, +1 = 右足前
   const w = standing.width, h = standing.height;
-  const bounds = findCharBounds(standing);
-  if (bounds.minX > bounds.maxX) return cloneCanvas(standing);
+  const b = findBounds(standing);
+  if (b.x0 > b.x1) return standing;
 
-  const charH = bounds.maxY - bounds.minY + 1;
-  // 下から1/3を足とみなす
-  const legStart = bounds.maxY - Math.floor(charH * 0.33);
-  const legH = bounds.maxY - legStart + 1;
+  const charH = b.y1 - b.y0 + 1;
+  const legStart = b.y1 - Math.floor(charH * 0.35);
 
-  const srcData = getPixels(standing);
-  const sd = srcData.data;
+  const src = getPixels(standing);
+  const sd = src.data;
   const dst = new ImageData(w, h);
   const dd = dst.data;
 
-  const shiftPx = Math.max(1, Math.round(size / 20)) * direction;
-  const bounce = -Math.max(1, Math.floor(size / 32));
+  const shiftPx = Math.max(1, Math.round(size / 22)) * direction;
+  const bounce = Math.max(1, Math.floor(size / 32));
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const si = (y * w + x) * 4;
-      if (sd[si + 3] === 0) continue;
+      if (sd[si+3] === 0) continue;
 
-      let nx = x, ny = y + bounce;
+      let nx = x, ny = y - bounce; // 全体を少し上に（バウンス）
       if (y >= legStart) {
-        const progress = (y - legStart) / Math.max(legH - 1, 1);
+        const legH = b.y1 - legStart;
+        const progress = legH > 0 ? (y - legStart) / legH : 0;
         nx = x + Math.round(shiftPx * progress);
       }
       if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
@@ -321,214 +431,107 @@ function makeWalkFrame(standing, direction, size) {
   return fromImageData(dst);
 }
 
-// --- 横向き ---
+// --- Generate ---
+function generateIfAny() {
+  const dirs = ['down', 'left', 'right', 'up'];
+  const dirLabels = { down: '正面 ↓', left: '左 ←', right: '右 →', up: '後ろ ↑' };
+  const activeDirs = dirs.filter(d => images[d]);
 
-function makeSideView(front, size) {
-  const w = front.width, h = front.height;
-  const srcData = getPixels(front);
-  const sd = srcData.data;
-  const bounds = findCharBounds(front);
-  if (bounds.minX > bounds.maxX) return cloneCanvas(front);
+  // Clear previous animations
+  animTimers.forEach(t => clearInterval(t));
+  animTimers = [];
 
-  const centerX = (bounds.minX + bounds.maxX) / 2;
-  const dst = new ImageData(w, h);
-  const dd = dst.data;
+  if (activeDirs.length === 0) {
+    $('resultSection').style.display = 'none';
+    return;
+  }
 
-  // 左半分を少し右にシフト、右半分を少し左にシフトして薄くする
-  // → 横向きに見せる
-  const shiftPx = Math.max(1, Math.round(size / 16));
+  const size = parseInt($('cellSize').value);
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const si = (y * w + x) * 4;
-      if (sd[si + 3] === 0) continue;
+  // Process each direction
+  const processed = {};
+  const walkFrames = {};
+  for (const dir of activeDirs) {
+    processed[dir] = processInput(images[dir], size);
+    walkFrames[dir] = {
+      left: makeWalkFrame(processed[dir], -1, size),
+      stand: processed[dir],
+      right: makeWalkFrame(processed[dir], 1, size),
+    };
+  }
 
-      let nx;
-      if (x <= centerX) {
-        // 左半分 → 右にシフト（体の奥側として前に出す）
-        nx = x + shiftPx;
-      } else {
-        // 右半分 → さらに右にシフト（体の手前側）
-        nx = x + Math.round(shiftPx * 0.3);
-      }
+  // Animated previews
+  const animContainer = $('animPreview');
+  animContainer.innerHTML = '';
+  const scale = Math.max(2, Math.floor(96 / size));
 
-      if (nx >= 0 && nx < w) {
-        const di = (y * w + nx) * 4;
-        dd[di] = sd[si]; dd[di+1] = sd[si+1];
-        dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
-      }
+  for (const dir of activeDirs) {
+    const box = document.createElement('div');
+    box.className = 'anim-box';
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = dirLabels[dir];
+    box.appendChild(label);
+    const c = document.createElement('canvas');
+    c.width = size * scale; c.height = size * scale;
+    c.style.width = (size * scale) + 'px';
+    c.style.height = (size * scale) + 'px';
+    box.appendChild(c);
+    animContainer.appendChild(box);
+
+    // Animate: stand → walkL → stand → walkR → repeat
+    const frames = [
+      walkFrames[dir].stand,
+      walkFrames[dir].left,
+      walkFrames[dir].stand,
+      walkFrames[dir].right,
+    ];
+    let fi = 0;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    function drawFrame() {
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(frames[fi], 0, 0, size * scale, size * scale);
+      fi = (fi + 1) % frames.length;
     }
-  }
-  return fromImageData(dst);
-}
-
-function flipH(canvas) {
-  const c = newCanvas(canvas.width, canvas.height);
-  const ctx = c.getContext('2d');
-  ctx.scale(-1, 1);
-  ctx.drawImage(canvas, -canvas.width, 0);
-  return c;
-}
-
-// --- 後ろ向き ---
-
-function makeBackView(front, size) {
-  const w = front.width, h = front.height;
-  const srcData = getPixels(front);
-  const sd = srcData.data;
-  const bounds = findCharBounds(front);
-  if (bounds.minX > bounds.maxX) return cloneCanvas(front);
-
-  const charH = bounds.maxY - bounds.minY + 1;
-  // 頭部 = 上から35%, 胴体 = 35%〜65%, 足 = 65%〜
-  const headEnd = bounds.minY + Math.floor(charH * 0.35);
-  const bodyEnd = bounds.minY + Math.floor(charH * 0.65);
-
-  // 頭部の中の「顔」領域（中央60%）を特定
-  const headMinX = bounds.minX;
-  const headMaxX = bounds.maxX;
-  const headW = headMaxX - headMinX;
-  const faceLX = headMinX + Math.floor(headW * 0.2);
-  const faceRX = headMaxX - Math.floor(headW * 0.2);
-
-  // 髪色を取得（頭の上部の外縁ピクセル）
-  const hairColors = [];
-  for (let y = bounds.minY; y < Math.min(bounds.minY + Math.floor(charH * 0.15), h); y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (sd[i + 3] > 128) {
-        hairColors.push([sd[i], sd[i+1], sd[i+2]]);
-      }
-    }
-  }
-  let hairR = 80, hairG = 60, hairB = 40;
-  if (hairColors.length > 0) {
-    hairR = Math.round(hairColors.reduce((s, c) => s + c[0], 0) / hairColors.length);
-    hairG = Math.round(hairColors.reduce((s, c) => s + c[1], 0) / hairColors.length);
-    hairB = Math.round(hairColors.reduce((s, c) => s + c[2], 0) / hairColors.length);
+    drawFrame();
+    animTimers.push(setInterval(drawFrame, 200));
   }
 
-  const dst = new ImageData(w, h);
-  const dd = dst.data;
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const si = (y * w + x) * 4;
-      if (sd[si + 3] === 0) continue;
-
-      if (y < headEnd && y >= bounds.minY) {
-        // 頭部：顔の中央部分を髪色で塗りつぶし、外縁はそのまま（髪の毛）
-        if (x >= faceLX && x <= faceRX && y > bounds.minY + Math.floor(charH * 0.12)) {
-          // 顔部分 → 髪色に置換
-          dd[si] = hairR;
-          dd[si+1] = hairG;
-          dd[si+2] = hairB;
-          dd[si+3] = sd[si+3];
-        } else {
-          // 髪の外縁 → そのまま
-          dd[si] = sd[si]; dd[si+1] = sd[si+1];
-          dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
-        }
-      } else if (y < bodyEnd) {
-        // 胴体：ほぼそのまま、少し暗く
-        dd[si] = Math.round(sd[si] * 0.92);
-        dd[si+1] = Math.round(sd[si+1] * 0.92);
-        dd[si+2] = Math.round(sd[si+2] * 0.92);
-        dd[si+3] = sd[si+3];
-      } else {
-        // 足：そのまま
-        dd[si] = sd[si]; dd[si+1] = sd[si+1];
-        dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
-      }
-    }
-  }
-  return fromImageData(dst);
-}
-
-// --- メイン生成 ---
-
-function generate() {
-  const size = parseInt(cellSizeSelect.value);
-  const tolerance = parseInt(bgToleranceSelect.value);
-  const autoBg = autoBgCheck.checked;
-
-  // 元画像をcanvasに
-  let raw = newCanvas(currentImage.width, currentImage.height);
-  raw.getContext('2d').drawImage(currentImage, 0, 0);
-
-  // 背景除去
-  let processed = raw;
-  if (autoBg) {
-    const [bgR, bgG, bgB] = detectBgColor(raw);
-    bgColorInput.value = '#' + [bgR, bgG, bgB].map(v => v.toString(16).padStart(2, '0')).join('');
-    processed = removeBg(raw, bgR, bgG, bgB, tolerance);
-    bgNote.style.display = 'block';
-  } else {
-    const hex = bgColorInput.value;
-    const bgR = parseInt(hex.substr(1, 2), 16);
-    const bgG = parseInt(hex.substr(3, 2), 16);
-    const bgB = parseInt(hex.substr(5, 2), 16);
-    processed = removeBg(raw, bgR, bgG, bgB, tolerance);
-    bgNote.style.display = 'none';
-  }
-
-  // セルサイズに合わせて中央配置
-  const front = centerCharacter(processed, size);
-
-  // プレビュー
-  const scale = Math.max(2, Math.floor(160 / size));
-  inputPreview.width = size * scale;
-  inputPreview.height = size * scale;
-  const ictx = inputPreview.getContext('2d');
-  ictx.imageSmoothingEnabled = false;
-  ictx.drawImage(front, 0, 0, size * scale, size * scale);
-
-  // スプライトシート生成
-  const frontStand = front;
-  const frontWalkL = makeWalkFrame(frontStand, -1, size);
-  const frontWalkR = makeWalkFrame(frontStand, 1, size);
-
-  const leftStand = makeSideView(frontStand, size);
-  const leftWalkL = makeWalkFrame(leftStand, -1, size);
-  const leftWalkR = makeWalkFrame(leftStand, 1, size);
-
-  const rightStand = flipH(leftStand);
-  const rightWalkL = flipH(leftWalkR);
-  const rightWalkR = flipH(leftWalkL);
-
-  const backStand = makeBackView(frontStand, size);
-  const backWalkL = makeWalkFrame(backStand, -1, size);
-  const backWalkR = makeWalkFrame(backStand, 1, size);
-
-  const sheetW = size * 3, sheetH = size * 4;
+  // Sprite sheet
+  const sheetW = size * 3;
+  const sheetH = size * activeDirs.length;
   const sheet = newCanvas(sheetW, sheetH);
-  const ctx = sheet.getContext('2d');
+  const sctx = sheet.getContext('2d');
 
-  const rows = [
-    [frontWalkL, frontStand, frontWalkR],
-    [leftWalkL,  leftStand,  leftWalkR],
-    [rightWalkL, rightStand, rightWalkR],
-    [backWalkL,  backStand,  backWalkR],
-  ];
-  rows.forEach((row, ri) => {
-    row.forEach((frame, ci) => {
-      ctx.drawImage(frame, ci * size, ri * size);
-    });
+  const rowLabelsEl = $('rowLabels');
+  rowLabelsEl.innerHTML = '';
+
+  activeDirs.forEach((dir, ri) => {
+    const f = walkFrames[dir];
+    sctx.drawImage(f.left, 0, ri * size);
+    sctx.drawImage(f.stand, size, ri * size);
+    sctx.drawImage(f.right, size * 2, ri * size);
+
+    const span = document.createElement('span');
+    span.textContent = dirLabels[dir];
+    rowLabelsEl.appendChild(span);
   });
 
-  // シートプレビュー
-  sheetPreview.width = sheetW * scale;
-  sheetPreview.height = sheetH * scale;
-  const sctx = sheetPreview.getContext('2d');
-  sctx.imageSmoothingEnabled = false;
-  sctx.drawImage(sheet, 0, 0, sheetW * scale, sheetH * scale);
+  // Preview
+  const sheetCanvas = $('sheetCanvas');
+  sheetCanvas.width = sheetW * scale;
+  sheetCanvas.height = sheetH * scale;
+  const pctx = sheetCanvas.getContext('2d');
+  pctx.imageSmoothingEnabled = false;
+  pctx.drawImage(sheet, 0, 0, sheetW * scale, sheetH * scale);
 
   sheetDataURL = sheet.toDataURL('image/png');
-  previewArea.style.display = 'flex';
-  resultArea.style.display = 'block';
+  $('resultSection').style.display = '';
 }
 
-downloadBtn.addEventListener('click', () => {
+// Download
+$('downloadBtn').addEventListener('click', () => {
   if (!sheetDataURL) return;
   const a = document.createElement('a');
   a.href = sheetDataURL;
