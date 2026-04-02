@@ -16,127 +16,82 @@ body {
   align-items: center;
   padding: 20px;
 }
-h1 {
-  font-size: 1.4em;
-  margin-bottom: 8px;
-  color: #fff;
-}
-.subtitle {
-  font-size: 0.85em;
-  color: #888;
-  margin-bottom: 20px;
-}
+h1 { font-size: 1.4em; margin-bottom: 8px; color: #fff; }
+.subtitle { font-size: 0.85em; color: #888; margin-bottom: 20px; }
 .controls {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: flex; gap: 16px; align-items: center;
+  margin-bottom: 20px; flex-wrap: wrap; justify-content: center;
 }
-.controls label {
-  font-size: 0.9em;
-  color: #aaa;
+.controls label { font-size: 0.9em; color: #aaa; }
+.controls select, .controls input[type="color"] {
+  background: #2a2a4a; color: #fff; border: 1px solid #444;
+  padding: 6px 10px; border-radius: 6px; font-size: 0.9em;
 }
-.controls select {
-  background: #2a2a4a;
-  color: #fff;
-  border: 1px solid #444;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 0.9em;
-}
+.controls input[type="color"] { width: 40px; height: 32px; padding: 2px; cursor: pointer; }
+.controls input[type="checkbox"] { margin-right: 4px; }
 .drop-zone {
-  width: 320px;
-  height: 200px;
-  border: 2px dashed #555;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 20px;
-  background: #16213e;
+  width: 320px; height: 200px; border: 2px dashed #555;
+  border-radius: 12px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.2s; margin-bottom: 20px; background: #16213e;
 }
-.drop-zone:hover, .drop-zone.dragover {
-  border-color: #4fc3f7;
-  background: #1a2744;
-}
+.drop-zone:hover, .drop-zone.dragover { border-color: #4fc3f7; background: #1a2744; }
 .drop-zone .icon { font-size: 2.5em; margin-bottom: 8px; }
 .drop-zone p { font-size: 0.9em; color: #888; }
 .drop-zone p.main-text { color: #ccc; font-size: 1em; margin-bottom: 4px; }
 input[type="file"] { display: none; }
-
 .preview-area {
-  display: flex;
-  gap: 30px;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
-  margin-bottom: 20px;
+  display: flex; gap: 30px; flex-wrap: wrap;
+  justify-content: center; align-items: flex-start; margin-bottom: 20px;
 }
-.preview-box {
-  text-align: center;
-}
-.preview-box h3 {
-  font-size: 0.85em;
-  color: #888;
-  margin-bottom: 8px;
-}
+.preview-box { text-align: center; }
+.preview-box h3 { font-size: 0.85em; color: #888; margin-bottom: 8px; }
 .preview-box canvas {
-  border: 1px solid #333;
-  border-radius: 4px;
-  image-rendering: pixelated;
-  background: #111;
+  border: 1px solid #333; border-radius: 4px;
+  image-rendering: pixelated; background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 16px 16px;
 }
-.result-area {
-  text-align: center;
-}
+.result-area { text-align: center; }
 .btn {
-  background: #4fc3f7;
-  color: #111;
-  border: none;
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-size: 1em;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
-  margin-top: 12px;
+  background: #4fc3f7; color: #111; border: none;
+  padding: 10px 24px; border-radius: 8px; font-size: 1em;
+  font-weight: bold; cursor: pointer; transition: background 0.2s; margin-top: 12px;
 }
 .btn:hover { background: #81d4fa; }
 .btn:disabled { background: #444; color: #777; cursor: not-allowed; }
-.info {
-  font-size: 0.8em;
-  color: #666;
-  margin-top: 16px;
-  text-align: center;
-  max-width: 500px;
-}
+.info { font-size: 0.8em; color: #666; margin-top: 16px; text-align: center; max-width: 550px; }
 .row-labels {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  font-size: 0.75em;
-  color: #888;
-  padding: 20px 0;
+  display: flex; flex-direction: column; justify-content: space-around;
+  font-size: 0.75em; color: #888; padding: 20px 0;
 }
+.note { font-size: 0.8em; color: #f0ad4e; margin-top: 10px; max-width: 550px; text-align: center; }
 </style>
 </head>
 <body>
 
 <h1>RPGツクール スプライトシート生成ツール</h1>
-<p class="subtitle">正面画像1枚から 3×4 スプライトシートを自動生成</p>
+<p class="subtitle">正面画像1枚から 3x4 スプライトシートを自動生成</p>
 
 <div class="controls">
   <label>セルサイズ:
     <select id="cellSize">
-      <option value="32">32×32</option>
-      <option value="48" selected>48×48</option>
-      <option value="64">64×64</option>
-      <option value="96">96×96</option>
+      <option value="32">32x32</option>
+      <option value="48" selected>48x48</option>
+      <option value="64">64x64</option>
+      <option value="96">96x96</option>
+    </select>
+  </label>
+  <label>
+    <input type="checkbox" id="autoBg" checked>
+    背景自動除去
+  </label>
+  <label>背景色:
+    <input type="color" id="bgColor" value="#ffffff">
+  </label>
+  <label>許容値:
+    <select id="bgTolerance">
+      <option value="20">低</option>
+      <option value="40" selected>中</option>
+      <option value="60">高</option>
     </select>
   </label>
 </div>
@@ -150,7 +105,7 @@ input[type="file"] { display: none; }
 
 <div class="preview-area" id="previewArea" style="display:none;">
   <div class="preview-box">
-    <h3>入力画像</h3>
+    <h3>入力画像（背景除去後）</h3>
     <canvas id="inputPreview"></canvas>
   </div>
   <div class="preview-box">
@@ -171,47 +126,43 @@ input[type="file"] { display: none; }
   <button class="btn" id="downloadBtn">ダウンロード (.png)</button>
 </div>
 
+<p class="note" id="bgNote" style="display:none;">
+  背景色が自動検出されました。うまくいかない場合は「背景色」を手動で選択してください。
+</p>
+
 <p class="info">
   対応形式: PNG / JPG / GIF / WebP（透過PNG推奨）<br>
-  出力: RPGツクール標準 3列×4行（正面・左・右・後ろ × 歩行左・立ち・歩行右）
+  出力: RPGツクール標準 3列x4行（正面・左・右・後ろ × 歩行左・立ち・歩行右）<br>
+  ※ 横向き・後ろ向きは正面画像からの近似生成です
 </p>
 
 <script>
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const cellSizeSelect = document.getElementById('cellSize');
-const previewArea = document.getElementById('previewArea');
-const resultArea = document.getElementById('resultArea');
-const downloadBtn = document.getElementById('downloadBtn');
-const inputPreview = document.getElementById('inputPreview');
-const sheetPreview = document.getElementById('sheetPreview');
+const $ = id => document.getElementById(id);
+const dropZone = $('dropZone'), fileInput = $('fileInput');
+const cellSizeSelect = $('cellSize'), autoBgCheck = $('autoBg');
+const bgColorInput = $('bgColor'), bgToleranceSelect = $('bgTolerance');
+const previewArea = $('previewArea'), resultArea = $('resultArea');
+const downloadBtn = $('downloadBtn'), bgNote = $('bgNote');
+const inputPreview = $('inputPreview'), sheetPreview = $('sheetPreview');
 
-let currentImage = null;
-let sheetDataURL = null;
+let currentImage = null, sheetDataURL = null;
 
-// ドラッグ＆ドロップ
 dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('dragover');
-});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
-fileInput.addEventListener('change', (e) => {
-  if (e.target.files.length > 0) handleFile(e.target.files[0]);
-});
-cellSizeSelect.addEventListener('change', () => {
-  if (currentImage) generate();
-});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+[cellSizeSelect, autoBgCheck, bgColorInput, bgToleranceSelect].forEach(el =>
+  el.addEventListener('change', () => { if (currentImage) generate(); })
+);
 
 function handleFile(file) {
   if (!file.type.startsWith('image/')) { alert('画像ファイルを選択してください'); return; }
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = e => {
     const img = new Image();
     img.onload = () => { currentImage = img; generate(); };
     img.src = e.target.result;
@@ -219,270 +170,364 @@ function handleFile(file) {
   reader.readAsDataURL(file);
 }
 
-function generate() {
-  const size = parseInt(cellSizeSelect.value);
-  const src = resizeToCell(currentImage, size);
-
-  // 入力プレビュー
-  const scale = Math.max(1, Math.floor(128 / size));
-  inputPreview.width = size * scale;
-  inputPreview.height = size * scale;
-  const ictx = inputPreview.getContext('2d');
-  ictx.imageSmoothingEnabled = false;
-  ictx.drawImage(src, 0, 0, size * scale, size * scale);
-
-  // スプライトシート生成
-  const sheet = generateSpriteSheet(src, size);
-
-  // シートプレビュー
-  const sw = size * 3;
-  const sh = size * 4;
-  sheetPreview.width = sw * scale;
-  sheetPreview.height = sh * scale;
-  const sctx = sheetPreview.getContext('2d');
-  sctx.imageSmoothingEnabled = false;
-  sctx.drawImage(sheet, 0, 0, sw * scale, sh * scale);
-
-  // ダウンロード用データ
-  sheetDataURL = sheet.toDataURL('image/png');
-  previewArea.style.display = 'flex';
-  resultArea.style.display = 'block';
-}
-
-function resizeToCell(img, size) {
-  const c = document.createElement('canvas');
-  c.width = size; c.height = size;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(img, 0, 0, size, size);
-  return c;
-}
-
-function getPixels(canvas) {
-  return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-}
-
-function canvasFromImageData(imageData) {
-  const c = document.createElement('canvas');
-  c.width = imageData.width; c.height = imageData.height;
-  c.getContext('2d').putImageData(imageData, 0, 0);
-  return c;
-}
-
-// --- 変形処理 ---
-
-function applyBounce(canvas, dy) {
-  const w = canvas.width, h = canvas.height;
+function newCanvas(w, h) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  if (dy > 0) {
-    ctx.drawImage(canvas, 0, 0, w, h - dy, 0, dy, w, h - dy);
-  } else if (dy < 0) {
-    ctx.drawImage(canvas, 0, -dy, w, h + dy, 0, 0, w, h + dy);
-  } else {
-    ctx.drawImage(canvas, 0, 0);
-  }
   return c;
 }
 
-function applyLegShear(canvas, direction, size) {
+function getPixels(c) { return c.getContext('2d').getImageData(0, 0, c.width, c.height); }
+function putPixels(c, d) { c.getContext('2d').putImageData(d, 0, 0); }
+
+function fromImageData(d) {
+  const c = newCanvas(d.width, d.height);
+  putPixels(c, d); return c;
+}
+
+function cloneCanvas(src) {
+  const c = newCanvas(src.width, src.height);
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+
+// --- 背景除去 ---
+
+function detectBgColor(canvas) {
+  const d = getPixels(canvas).data;
   const w = canvas.width, h = canvas.height;
-  const mid = Math.floor(h / 2);
-  const shearPx = Math.max(1, Math.floor(size / 16)) * direction;
-
-  const srcData = getPixels(canvas);
-  const dst = new ImageData(w, h);
-  const sd = srcData.data, dd = dst.data;
-
-  // 上半分コピー
-  for (let y = 0; y < mid; y++) {
-    for (let x = 0; x < w; x++) {
-      const si = (y * w + x) * 4;
-      dd[si] = sd[si]; dd[si+1] = sd[si+1]; dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
+  // 四隅のピクセルからもっとも多い色を取得
+  const corners = [];
+  for (let dy = 0; dy < 3; dy++) {
+    for (let dx = 0; dx < 3; dx++) {
+      corners.push([dx, dy]);
+      corners.push([w - 1 - dx, dy]);
+      corners.push([dx, h - 1 - dy]);
+      corners.push([w - 1 - dx, h - 1 - dy]);
     }
   }
+  const colorCount = {};
+  corners.forEach(([x, y]) => {
+    const i = (y * w + x) * 4;
+    const key = `${d[i]},${d[i+1]},${d[i+2]}`;
+    colorCount[key] = (colorCount[key] || 0) + 1;
+  });
+  let best = null, bestCount = 0;
+  for (const [key, count] of Object.entries(colorCount)) {
+    if (count > bestCount) { best = key; bestCount = count; }
+  }
+  const [r, g, b] = best.split(',').map(Number);
+  return [r, g, b];
+}
 
-  // 下半分シアー
-  const lowerH = h - mid;
-  for (let y = 0; y < lowerH; y++) {
-    const progress = lowerH > 1 ? y / (lowerH - 1) : 0;
-    const offset = Math.round(shearPx * progress);
-    const srcY = mid + y;
+function removeBg(canvas, bgR, bgG, bgB, tolerance) {
+  const id = getPixels(canvas);
+  const d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const dr = d[i] - bgR, dg = d[i+1] - bgG, db = d[i+2] - bgB;
+    const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+    if (dist < tolerance) {
+      d[i+3] = 0; // 透明にする
+    } else if (dist < tolerance * 1.5) {
+      // エッジを半透明にしてなめらかに
+      const alpha = Math.min(255, Math.round((dist - tolerance) / (tolerance * 0.5) * 255));
+      d[i+3] = Math.min(d[i+3], alpha);
+    }
+  }
+  return fromImageData(id);
+}
+
+// --- キャラクターの境界ボックス検出 ---
+
+function findCharBounds(canvas) {
+  const d = getPixels(canvas).data;
+  const w = canvas.width, h = canvas.height;
+  let minX = w, maxX = 0, minY = h, maxY = 0;
+  for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const nx = x + offset;
-      if (nx >= 0 && nx < w) {
-        const si = (srcY * w + x) * 4;
-        const di = (srcY * w + nx) * 4;
-        dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      if (d[(y * w + x) * 4 + 3] > 32) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
       }
     }
   }
-
-  return canvasFromImageData(dst);
+  return { minX, maxX, minY, maxY };
 }
 
-function makeWalkFrames(standing, size) {
-  const bounce = Math.max(1, Math.floor(size / 24));
-  const walkL = applyBounce(applyLegShear(standing, -1, size), -bounce);
-  const walkR = applyBounce(applyLegShear(standing, 1, size), -bounce);
-  return [walkL, walkR];
-}
+// キャラクターを中央に配置してセルサイズに合わせる
+function centerCharacter(canvas, size) {
+  const bounds = findCharBounds(canvas);
+  if (bounds.minX > bounds.maxX) return newCanvas(size, size); // 空
 
-function makeSideView(front, size) {
-  const w = front.width, h = front.height;
-  const compW = Math.round(w * 0.75);
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  const charW = bounds.maxX - bounds.minX + 1;
+  const charH = bounds.maxY - bounds.minY + 1;
+
+  // セルに収まるようにスケール（少し余白を残す）
+  const margin = Math.max(1, Math.floor(size * 0.05));
+  const available = size - margin * 2;
+  const scale = Math.min(available / charW, available / charH, 1);
+
+  const scaledW = Math.round(charW * scale);
+  const scaledH = Math.round(charH * scale);
+
+  const c = newCanvas(size, size);
   const ctx = c.getContext('2d');
-  const offsetX = Math.min(Math.floor((w - compW) / 2) + Math.max(1, Math.floor(size / 24)), w - compW);
-  ctx.drawImage(front, 0, 0, w, h, offsetX, 0, compW, h);
+  ctx.imageSmoothingEnabled = false;
+  const dx = Math.floor((size - scaledW) / 2);
+  const dy = size - scaledH - margin; // 足元を下揃え
+  ctx.drawImage(canvas, bounds.minX, bounds.minY, charW, charH, dx, dy, scaledW, scaledH);
   return c;
 }
 
+// --- 歩行アニメーション ---
+
+function makeWalkFrame(standing, direction, size) {
+  // direction: -1=左足前, +1=右足前
+  const w = standing.width, h = standing.height;
+  const bounds = findCharBounds(standing);
+  if (bounds.minX > bounds.maxX) return cloneCanvas(standing);
+
+  const charH = bounds.maxY - bounds.minY + 1;
+  // 下から1/3を足とみなす
+  const legStart = bounds.maxY - Math.floor(charH * 0.33);
+  const legH = bounds.maxY - legStart + 1;
+
+  const srcData = getPixels(standing);
+  const sd = srcData.data;
+  const dst = new ImageData(w, h);
+  const dd = dst.data;
+
+  const shiftPx = Math.max(1, Math.round(size / 20)) * direction;
+  const bounce = -Math.max(1, Math.floor(size / 32));
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      if (sd[si + 3] === 0) continue;
+
+      let nx = x, ny = y + bounce;
+      if (y >= legStart) {
+        const progress = (y - legStart) / Math.max(legH - 1, 1);
+        nx = x + Math.round(shiftPx * progress);
+      }
+      if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+        const di = (ny * w + nx) * 4;
+        dd[di] = sd[si]; dd[di+1] = sd[si+1];
+        dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      }
+    }
+  }
+  return fromImageData(dst);
+}
+
+// --- 横向き ---
+
+function makeSideView(front, size) {
+  const w = front.width, h = front.height;
+  const srcData = getPixels(front);
+  const sd = srcData.data;
+  const bounds = findCharBounds(front);
+  if (bounds.minX > bounds.maxX) return cloneCanvas(front);
+
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const dst = new ImageData(w, h);
+  const dd = dst.data;
+
+  // 左半分を少し右にシフト、右半分を少し左にシフトして薄くする
+  // → 横向きに見せる
+  const shiftPx = Math.max(1, Math.round(size / 16));
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      if (sd[si + 3] === 0) continue;
+
+      let nx;
+      if (x <= centerX) {
+        // 左半分 → 右にシフト（体の奥側として前に出す）
+        nx = x + shiftPx;
+      } else {
+        // 右半分 → さらに右にシフト（体の手前側）
+        nx = x + Math.round(shiftPx * 0.3);
+      }
+
+      if (nx >= 0 && nx < w) {
+        const di = (y * w + nx) * 4;
+        dd[di] = sd[si]; dd[di+1] = sd[si+1];
+        dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      }
+    }
+  }
+  return fromImageData(dst);
+}
+
 function flipH(canvas) {
-  const c = document.createElement('canvas');
-  c.width = canvas.width; c.height = canvas.height;
+  const c = newCanvas(canvas.width, canvas.height);
   const ctx = c.getContext('2d');
   ctx.scale(-1, 1);
   ctx.drawImage(canvas, -canvas.width, 0);
   return c;
 }
 
-function getDominantColors(canvas) {
-  const w = canvas.width, h = canvas.height;
-  const data = getPixels(canvas).data;
-  const headEnd = Math.floor(h / 3);
-  const bodyEnd = Math.floor(2 * h / 3);
-
-  function avgColor(yStart, yEnd) {
-    let r = 0, g = 0, b = 0, count = 0;
-    for (let y = yStart; y < yEnd; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        if (data[i + 3] > 128) {
-          r += data[i]; g += data[i+1]; b += data[i+2]; count++;
-        }
-      }
-    }
-    if (count === 0) return [128, 128, 128];
-    return [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
-  }
-
-  return { head: avgColor(0, headEnd), body: avgColor(headEnd, bodyEnd) };
-}
+// --- 後ろ向き ---
 
 function makeBackView(front, size) {
   const w = front.width, h = front.height;
   const srcData = getPixels(front);
   const sd = srcData.data;
-  const colors = getDominantColors(front);
-  const headEnd = Math.floor(h / 3);
-  const bodyEnd = Math.floor(2 * h / 3);
+  const bounds = findCharBounds(front);
+  if (bounds.minX > bounds.maxX) return cloneCanvas(front);
+
+  const charH = bounds.maxY - bounds.minY + 1;
+  // 頭部 = 上から35%, 胴体 = 35%〜65%, 足 = 65%〜
+  const headEnd = bounds.minY + Math.floor(charH * 0.35);
+  const bodyEnd = bounds.minY + Math.floor(charH * 0.65);
+
+  // 頭部の中の「顔」領域（中央60%）を特定
+  const headMinX = bounds.minX;
+  const headMaxX = bounds.maxX;
+  const headW = headMaxX - headMinX;
+  const faceLX = headMinX + Math.floor(headW * 0.2);
+  const faceRX = headMaxX - Math.floor(headW * 0.2);
+
+  // 髪色を取得（頭の上部の外縁ピクセル）
+  const hairColors = [];
+  for (let y = bounds.minY; y < Math.min(bounds.minY + Math.floor(charH * 0.15), h); y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (sd[i + 3] > 128) {
+        hairColors.push([sd[i], sd[i+1], sd[i+2]]);
+      }
+    }
+  }
+  let hairR = 80, hairG = 60, hairB = 40;
+  if (hairColors.length > 0) {
+    hairR = Math.round(hairColors.reduce((s, c) => s + c[0], 0) / hairColors.length);
+    hairG = Math.round(hairColors.reduce((s, c) => s + c[1], 0) / hairColors.length);
+    hairB = Math.round(hairColors.reduce((s, c) => s + c[2], 0) / hairColors.length);
+  }
 
   const dst = new ImageData(w, h);
   const dd = dst.data;
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      const a = sd[i + 3];
-      if (a > 64) {
-        let baseR, baseG, baseB;
-        if (y < headEnd) {
-          [baseR, baseG, baseB] = colors.head;
-          const dark = 0.85;
-          dd[i] = Math.min(255, Math.round(baseR * dark));
-          dd[i+1] = Math.min(255, Math.round(baseG * dark));
-          dd[i+2] = Math.min(255, Math.round(baseB * dark));
-        } else if (y < bodyEnd) {
-          [baseR, baseG, baseB] = colors.body;
-          const dark = 0.9;
-          dd[i] = Math.min(255, Math.round(baseR * dark));
-          dd[i+1] = Math.min(255, Math.round(baseG * dark));
-          dd[i+2] = Math.min(255, Math.round(baseB * dark));
+      const si = (y * w + x) * 4;
+      if (sd[si + 3] === 0) continue;
+
+      if (y < headEnd && y >= bounds.minY) {
+        // 頭部：顔の中央部分を髪色で塗りつぶし、外縁はそのまま（髪の毛）
+        if (x >= faceLX && x <= faceRX && y > bounds.minY + Math.floor(charH * 0.12)) {
+          // 顔部分 → 髪色に置換
+          dd[si] = hairR;
+          dd[si+1] = hairG;
+          dd[si+2] = hairB;
+          dd[si+3] = sd[si+3];
         } else {
-          const dark = 0.9;
-          dd[i] = Math.min(255, Math.round(sd[i] * dark));
-          dd[i+1] = Math.min(255, Math.round(sd[i+1] * dark));
-          dd[i+2] = Math.min(255, Math.round(sd[i+2] * dark));
+          // 髪の外縁 → そのまま
+          dd[si] = sd[si]; dd[si+1] = sd[si+1];
+          dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
         }
-        dd[i + 3] = a;
+      } else if (y < bodyEnd) {
+        // 胴体：ほぼそのまま、少し暗く
+        dd[si] = Math.round(sd[si] * 0.92);
+        dd[si+1] = Math.round(sd[si+1] * 0.92);
+        dd[si+2] = Math.round(sd[si+2] * 0.92);
+        dd[si+3] = sd[si+3];
+      } else {
+        // 足：そのまま
+        dd[si] = sd[si]; dd[si+1] = sd[si+1];
+        dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
       }
     }
   }
-
-  // 頭部をぼかす
-  const backCanvas = canvasFromImageData(dst);
-  const blurR = Math.max(1, Math.floor(size / 24));
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = w; tempCanvas.height = h;
-  const tctx = tempCanvas.getContext('2d');
-  tctx.filter = `blur(${blurR}px)`;
-  tctx.drawImage(backCanvas, 0, 0);
-
-  // 頭部だけぼかし版に置換
-  const finalCtx = backCanvas.getContext('2d');
-  finalCtx.save();
-  finalCtx.beginPath();
-  finalCtx.rect(0, 0, w, headEnd);
-  finalCtx.clip();
-  finalCtx.clearRect(0, 0, w, headEnd);
-  finalCtx.drawImage(tempCanvas, 0, 0);
-  finalCtx.restore();
-
-  // 元のアルファマスクを適用
-  const finalData = getPixels(backCanvas);
-  const fd = finalData.data;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      fd[i + 3] = sd[i + 3];
-    }
-  }
-  finalCtx.putImageData(finalData, 0, 0);
-
-  return backCanvas;
+  return fromImageData(dst);
 }
 
 // --- メイン生成 ---
 
-function generateSpriteSheet(frontCanvas, size) {
-  const frontStand = frontCanvas;
-  const [frontWalkL, frontWalkR] = makeWalkFrames(frontStand, size);
+function generate() {
+  const size = parseInt(cellSizeSelect.value);
+  const tolerance = parseInt(bgToleranceSelect.value);
+  const autoBg = autoBgCheck.checked;
+
+  // 元画像をcanvasに
+  let raw = newCanvas(currentImage.width, currentImage.height);
+  raw.getContext('2d').drawImage(currentImage, 0, 0);
+
+  // 背景除去
+  let processed = raw;
+  if (autoBg) {
+    const [bgR, bgG, bgB] = detectBgColor(raw);
+    bgColorInput.value = '#' + [bgR, bgG, bgB].map(v => v.toString(16).padStart(2, '0')).join('');
+    processed = removeBg(raw, bgR, bgG, bgB, tolerance);
+    bgNote.style.display = 'block';
+  } else {
+    const hex = bgColorInput.value;
+    const bgR = parseInt(hex.substr(1, 2), 16);
+    const bgG = parseInt(hex.substr(3, 2), 16);
+    const bgB = parseInt(hex.substr(5, 2), 16);
+    processed = removeBg(raw, bgR, bgG, bgB, tolerance);
+    bgNote.style.display = 'none';
+  }
+
+  // セルサイズに合わせて中央配置
+  const front = centerCharacter(processed, size);
+
+  // プレビュー
+  const scale = Math.max(2, Math.floor(160 / size));
+  inputPreview.width = size * scale;
+  inputPreview.height = size * scale;
+  const ictx = inputPreview.getContext('2d');
+  ictx.imageSmoothingEnabled = false;
+  ictx.drawImage(front, 0, 0, size * scale, size * scale);
+
+  // スプライトシート生成
+  const frontStand = front;
+  const frontWalkL = makeWalkFrame(frontStand, -1, size);
+  const frontWalkR = makeWalkFrame(frontStand, 1, size);
 
   const leftStand = makeSideView(frontStand, size);
-  const [leftWalkL, leftWalkR] = makeWalkFrames(leftStand, size);
+  const leftWalkL = makeWalkFrame(leftStand, -1, size);
+  const leftWalkR = makeWalkFrame(leftStand, 1, size);
 
   const rightStand = flipH(leftStand);
   const rightWalkL = flipH(leftWalkR);
   const rightWalkR = flipH(leftWalkL);
 
   const backStand = makeBackView(frontStand, size);
-  const [backWalkL, backWalkR] = makeWalkFrames(backStand, size);
+  const backWalkL = makeWalkFrame(backStand, -1, size);
+  const backWalkR = makeWalkFrame(backStand, 1, size);
 
-  const sheetW = size * 3;
-  const sheetH = size * 4;
-  const sheet = document.createElement('canvas');
-  sheet.width = sheetW; sheet.height = sheetH;
+  const sheetW = size * 3, sheetH = size * 4;
+  const sheet = newCanvas(sheetW, sheetH);
   const ctx = sheet.getContext('2d');
 
   const rows = [
     [frontWalkL, frontStand, frontWalkR],
-    [leftWalkL, leftStand, leftWalkR],
+    [leftWalkL,  leftStand,  leftWalkR],
     [rightWalkL, rightStand, rightWalkR],
-    [backWalkL, backStand, backWalkR],
+    [backWalkL,  backStand,  backWalkR],
   ];
-
   rows.forEach((row, ri) => {
     row.forEach((frame, ci) => {
       ctx.drawImage(frame, ci * size, ri * size);
     });
   });
 
-  return sheet;
+  // シートプレビュー
+  sheetPreview.width = sheetW * scale;
+  sheetPreview.height = sheetH * scale;
+  const sctx = sheetPreview.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(sheet, 0, 0, sheetW * scale, sheetH * scale);
+
+  sheetDataURL = sheet.toDataURL('image/png');
+  previewArea.style.display = 'flex';
+  resultArea.style.display = 'block';
 }
 
-// ダウンロード
 downloadBtn.addEventListener('click', () => {
   if (!sheetDataURL) return;
   const a = document.createElement('a');
