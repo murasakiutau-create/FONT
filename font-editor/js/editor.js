@@ -415,8 +415,8 @@ class GlyphEditor {
         e.preventDefault(); return;
       }
       if (this.editMode === 'select' || this.editMode === 'node') {
-        // Check if clicking on the glyph path for move (select mode only)
-        if (this.editMode === 'select' && this.glyph && this.glyph.pathData.length > 0) {
+        // In select mode, clicking on glyph area = move. But NOT if clicking nodes/handles.
+        if (this.editMode === 'select' && this.glyph && this.glyph.pathData.length > 0 && !e.target.closest('#nodes-layer')) {
           const b = getCmdsBounds(this.glyph.pathData);
           if (b.w > 0 && fp.x >= b.x && fp.x <= b.x + b.w && fp.y >= b.y && fp.y <= b.y + b.h) {
             this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
