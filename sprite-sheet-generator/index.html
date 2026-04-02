@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPGツクール スプライトシート生成ツール</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+h1 {
+  font-size: 1.4em;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.subtitle {
+  font-size: 0.85em;
+  color: #888;
+  margin-bottom: 20px;
+}
+.controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.controls label {
+  font-size: 0.9em;
+  color: #aaa;
+}
+.controls select {
+  background: #2a2a4a;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+.drop-zone {
+  width: 320px;
+  height: 200px;
+  border: 2px dashed #555;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+  background: #16213e;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: #4fc3f7;
+  background: #1a2744;
+}
+.drop-zone .icon { font-size: 2.5em; margin-bottom: 8px; }
+.drop-zone p { font-size: 0.9em; color: #888; }
+.drop-zone p.main-text { color: #ccc; font-size: 1em; margin-bottom: 4px; }
+input[type="file"] { display: none; }
+
+.preview-area {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.preview-box {
+  text-align: center;
+}
+.preview-box h3 {
+  font-size: 0.85em;
+  color: #888;
+  margin-bottom: 8px;
+}
+.preview-box canvas {
+  border: 1px solid #333;
+  border-radius: 4px;
+  image-rendering: pixelated;
+  background: #111;
+}
+.result-area {
+  text-align: center;
+}
+.btn {
+  background: #4fc3f7;
+  color: #111;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 12px;
+}
+.btn:hover { background: #81d4fa; }
+.btn:disabled { background: #444; color: #777; cursor: not-allowed; }
+.info {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 16px;
+  text-align: center;
+  max-width: 500px;
+}
+.row-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  font-size: 0.75em;
+  color: #888;
+  padding: 20px 0;
+}
+</style>
+</head>
+<body>
+
+<h1>RPGツクール スプライトシート生成ツール</h1>
+<p class="subtitle">正面画像1枚から 3×4 スプライトシートを自動生成</p>
+
+<div class="controls">
+  <label>セルサイズ:
+    <select id="cellSize">
+      <option value="32">32×32</option>
+      <option value="48" selected>48×48</option>
+      <option value="64">64×64</option>
+      <option value="96">96×96</option>
+    </select>
+  </label>
+</div>
+
+<div class="drop-zone" id="dropZone">
+  <div class="icon">📁</div>
+  <p class="main-text">画像をドラッグ＆ドロップ</p>
+  <p>またはクリックして選択</p>
+</div>
+<input type="file" id="fileInput" accept="image/*">
+
+<div class="preview-area" id="previewArea" style="display:none;">
+  <div class="preview-box">
+    <h3>入力画像</h3>
+    <canvas id="inputPreview"></canvas>
+  </div>
+  <div class="preview-box">
+    <h3>スプライトシート</h3>
+    <div style="display:flex; align-items:stretch;">
+      <div class="row-labels">
+        <span>正面 ↓</span>
+        <span>左 ←</span>
+        <span>右 →</span>
+        <span>後ろ ↑</span>
+      </div>
+      <canvas id="sheetPreview"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="result-area" id="resultArea" style="display:none;">
+  <button class="btn" id="downloadBtn">ダウンロード (.png)</button>
+</div>
+
+<p class="info">
+  対応形式: PNG / JPG / GIF / WebP（透過PNG推奨）<br>
+  出力: RPGツクール標準 3列×4行（正面・左・右・後ろ × 歩行左・立ち・歩行右）
+</p>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const cellSizeSelect = document.getElementById('cellSize');
+const previewArea = document.getElementById('previewArea');
+const resultArea = document.getElementById('resultArea');
+const downloadBtn = document.getElementById('downloadBtn');
+const inputPreview = document.getElementById('inputPreview');
+const sheetPreview = document.getElementById('sheetPreview');
+
+let currentImage = null;
+let sheetDataURL = null;
+
+// ドラッグ＆ドロップ
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 0) handleFile(e.target.files[0]);
+});
+cellSizeSelect.addEventListener('change', () => {
+  if (currentImage) generate();
+});
+
+function handleFile(file) {
+  if (!file.type.startsWith('image/')) { alert('画像ファイルを選択してください'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => { currentImage = img; generate(); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function generate() {
+  const size = parseInt(cellSizeSelect.value);
+  const src = resizeToCell(currentImage, size);
+
+  // 入力プレビュー
+  const scale = Math.max(1, Math.floor(128 / size));
+  inputPreview.width = size * scale;
+  inputPreview.height = size * scale;
+  const ictx = inputPreview.getContext('2d');
+  ictx.imageSmoothingEnabled = false;
+  ictx.drawImage(src, 0, 0, size * scale, size * scale);
+
+  // スプライトシート生成
+  const sheet = generateSpriteSheet(src, size);
+
+  // シートプレビュー
+  const sw = size * 3;
+  const sh = size * 4;
+  sheetPreview.width = sw * scale;
+  sheetPreview.height = sh * scale;
+  const sctx = sheetPreview.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(sheet, 0, 0, sw * scale, sh * scale);
+
+  // ダウンロード用データ
+  sheetDataURL = sheet.toDataURL('image/png');
+  previewArea.style.display = 'flex';
+  resultArea.style.display = 'block';
+}
+
+function resizeToCell(img, size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, size, size);
+  return c;
+}
+
+function getPixels(canvas) {
+  return canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function canvasFromImageData(imageData) {
+  const c = document.createElement('canvas');
+  c.width = imageData.width; c.height = imageData.height;
+  c.getContext('2d').putImageData(imageData, 0, 0);
+  return c;
+}
+
+// --- 変形処理 ---
+
+function applyBounce(canvas, dy) {
+  const w = canvas.width, h = canvas.height;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  if (dy > 0) {
+    ctx.drawImage(canvas, 0, 0, w, h - dy, 0, dy, w, h - dy);
+  } else if (dy < 0) {
+    ctx.drawImage(canvas, 0, -dy, w, h + dy, 0, 0, w, h + dy);
+  } else {
+    ctx.drawImage(canvas, 0, 0);
+  }
+  return c;
+}
+
+function applyLegShear(canvas, direction, size) {
+  const w = canvas.width, h = canvas.height;
+  const mid = Math.floor(h / 2);
+  const shearPx = Math.max(1, Math.floor(size / 16)) * direction;
+
+  const srcData = getPixels(canvas);
+  const dst = new ImageData(w, h);
+  const sd = srcData.data, dd = dst.data;
+
+  // 上半分コピー
+  for (let y = 0; y < mid; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = (y * w + x) * 4;
+      dd[si] = sd[si]; dd[si+1] = sd[si+1]; dd[si+2] = sd[si+2]; dd[si+3] = sd[si+3];
+    }
+  }
+
+  // 下半分シアー
+  const lowerH = h - mid;
+  for (let y = 0; y < lowerH; y++) {
+    const progress = lowerH > 1 ? y / (lowerH - 1) : 0;
+    const offset = Math.round(shearPx * progress);
+    const srcY = mid + y;
+    for (let x = 0; x < w; x++) {
+      const nx = x + offset;
+      if (nx >= 0 && nx < w) {
+        const si = (srcY * w + x) * 4;
+        const di = (srcY * w + nx) * 4;
+        dd[di] = sd[si]; dd[di+1] = sd[si+1]; dd[di+2] = sd[si+2]; dd[di+3] = sd[si+3];
+      }
+    }
+  }
+
+  return canvasFromImageData(dst);
+}
+
+function makeWalkFrames(standing, size) {
+  const bounce = Math.max(1, Math.floor(size / 24));
+  const walkL = applyBounce(applyLegShear(standing, -1, size), -bounce);
+  const walkR = applyBounce(applyLegShear(standing, 1, size), -bounce);
+  return [walkL, walkR];
+}
+
+function makeSideView(front, size) {
+  const w = front.width, h = front.height;
+  const compW = Math.round(w * 0.75);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const offsetX = Math.min(Math.floor((w - compW) / 2) + Math.max(1, Math.floor(size / 24)), w - compW);
+  ctx.drawImage(front, 0, 0, w, h, offsetX, 0, compW, h);
+  return c;
+}
+
+function flipH(canvas) {
+  const c = document.createElement('canvas');
+  c.width = canvas.width; c.height = canvas.height;
+  const ctx = c.getContext('2d');
+  ctx.scale(-1, 1);
+  ctx.drawImage(canvas, -canvas.width, 0);
+  return c;
+}
+
+function getDominantColors(canvas) {
+  const w = canvas.width, h = canvas.height;
+  const data = getPixels(canvas).data;
+  const headEnd = Math.floor(h / 3);
+  const bodyEnd = Math.floor(2 * h / 3);
+
+  function avgColor(yStart, yEnd) {
+    let r = 0, g = 0, b = 0, count = 0;
+    for (let y = yStart; y < yEnd; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (data[i + 3] > 128) {
+          r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+        }
+      }
+    }
+    if (count === 0) return [128, 128, 128];
+    return [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
+  }
+
+  return { head: avgColor(0, headEnd), body: avgColor(headEnd, bodyEnd) };
+}
+
+function makeBackView(front, size) {
+  const w = front.width, h = front.height;
+  const srcData = getPixels(front);
+  const sd = srcData.data;
+  const colors = getDominantColors(front);
+  const headEnd = Math.floor(h / 3);
+  const bodyEnd = Math.floor(2 * h / 3);
+
+  const dst = new ImageData(w, h);
+  const dd = dst.data;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const a = sd[i + 3];
+      if (a > 64) {
+        let baseR, baseG, baseB;
+        if (y < headEnd) {
+          [baseR, baseG, baseB] = colors.head;
+          const dark = 0.85;
+          dd[i] = Math.min(255, Math.round(baseR * dark));
+          dd[i+1] = Math.min(255, Math.round(baseG * dark));
+          dd[i+2] = Math.min(255, Math.round(baseB * dark));
+        } else if (y < bodyEnd) {
+          [baseR, baseG, baseB] = colors.body;
+          const dark = 0.9;
+          dd[i] = Math.min(255, Math.round(baseR * dark));
+          dd[i+1] = Math.min(255, Math.round(baseG * dark));
+          dd[i+2] = Math.min(255, Math.round(baseB * dark));
+        } else {
+          const dark = 0.9;
+          dd[i] = Math.min(255, Math.round(sd[i] * dark));
+          dd[i+1] = Math.min(255, Math.round(sd[i+1] * dark));
+          dd[i+2] = Math.min(255, Math.round(sd[i+2] * dark));
+        }
+        dd[i + 3] = a;
+      }
+    }
+  }
+
+  // 頭部をぼかす
+  const backCanvas = canvasFromImageData(dst);
+  const blurR = Math.max(1, Math.floor(size / 24));
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = w; tempCanvas.height = h;
+  const tctx = tempCanvas.getContext('2d');
+  tctx.filter = `blur(${blurR}px)`;
+  tctx.drawImage(backCanvas, 0, 0);
+
+  // 頭部だけぼかし版に置換
+  const finalCtx = backCanvas.getContext('2d');
+  finalCtx.save();
+  finalCtx.beginPath();
+  finalCtx.rect(0, 0, w, headEnd);
+  finalCtx.clip();
+  finalCtx.clearRect(0, 0, w, headEnd);
+  finalCtx.drawImage(tempCanvas, 0, 0);
+  finalCtx.restore();
+
+  // 元のアルファマスクを適用
+  const finalData = getPixels(backCanvas);
+  const fd = finalData.data;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      fd[i + 3] = sd[i + 3];
+    }
+  }
+  finalCtx.putImageData(finalData, 0, 0);
+
+  return backCanvas;
+}
+
+// --- メイン生成 ---
+
+function generateSpriteSheet(frontCanvas, size) {
+  const frontStand = frontCanvas;
+  const [frontWalkL, frontWalkR] = makeWalkFrames(frontStand, size);
+
+  const leftStand = makeSideView(frontStand, size);
+  const [leftWalkL, leftWalkR] = makeWalkFrames(leftStand, size);
+
+  const rightStand = flipH(leftStand);
+  const rightWalkL = flipH(leftWalkR);
+  const rightWalkR = flipH(leftWalkL);
+
+  const backStand = makeBackView(frontStand, size);
+  const [backWalkL, backWalkR] = makeWalkFrames(backStand, size);
+
+  const sheetW = size * 3;
+  const sheetH = size * 4;
+  const sheet = document.createElement('canvas');
+  sheet.width = sheetW; sheet.height = sheetH;
+  const ctx = sheet.getContext('2d');
+
+  const rows = [
+    [frontWalkL, frontStand, frontWalkR],
+    [leftWalkL, leftStand, leftWalkR],
+    [rightWalkL, rightStand, rightWalkR],
+    [backWalkL, backStand, backWalkR],
+  ];
+
+  rows.forEach((row, ri) => {
+    row.forEach((frame, ci) => {
+      ctx.drawImage(frame, ci * size, ri * size);
+    });
+  });
+
+  return sheet;
+}
+
+// ダウンロード
+downloadBtn.addEventListener('click', () => {
+  if (!sheetDataURL) return;
+  const a = document.createElement('a');
+  a.href = sheetDataURL;
+  a.download = 'spritesheet.png';
+  a.click();
+});
+</script>
+</body>
+</html>
