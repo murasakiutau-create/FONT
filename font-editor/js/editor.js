@@ -173,6 +173,29 @@ class GlyphEditor {
     this._renderNodes();
     this._renderAdvanceWidth();
     this._renderResizeHandles();
+    this._renderNodeCount();
+  }
+
+  _renderNodeCount() {
+    let el = this.overlayLayer.querySelector('#node-count-label');
+    if (!el) {
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      el.id = 'node-count-label';
+      el.setAttribute('class', 'guide-label');
+      el.setAttribute('text-anchor', 'end');
+      el.setAttribute('font-size', '11');
+      el.setAttribute('fill', '#999');
+      this.overlayLayer.appendChild(el);
+    }
+    const rect = this.svg.getBoundingClientRect();
+    el.setAttribute('x', (rect.width || 800) - 8);
+    el.setAttribute('y', 16);
+    if (!this.glyph || !this.glyph.pathData) {
+      el.textContent = '';
+      return;
+    }
+    const count = this.glyph.pathData.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+    el.textContent = `Nodes: ${count}`;
   }
 
   _renderGrid() {
@@ -696,7 +719,98 @@ class GlyphEditor {
   }
 
   _onDblclick(e) {
-    // Future: add node on double-click on path
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    if (this.editMode !== 'select' && this.editMode !== 'node') return;
+    const { sx, sy } = this._getEventPos(e);
+    const fp = this.screenToFont(sx, sy);
+    this._addNodeAtPoint(fp.x, fp.y);
+  }
+
+  _addNodeAtPoint(fx, fy) {
+    const cmds = this.glyph.pathData;
+    let bestDist = Infinity, bestIdx = -1, bestT = 0.5;
+    let px = 0, py = 0;
+
+    for (let i = 0; i < cmds.length; i++) {
+      const c = cmds[i];
+      if (c.type === 'M') { px = c.x; py = c.y; continue; }
+      if (c.type === 'Z') continue;
+      if (c.type === 'L') {
+        // Distance from point to line segment
+        const dx = c.x - px, dy = c.y - py;
+        const len2 = dx * dx + dy * dy;
+        if (len2 === 0) { px = c.x; py = c.y; continue; }
+        let t = ((fx - px) * dx + (fy - py) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = px + t * dx, cy = py + t * dy;
+        const dist = Math.hypot(fx - cx, fy - cy);
+        if (dist < bestDist) { bestDist = dist; bestIdx = i; bestT = t; }
+        px = c.x; py = c.y;
+      }
+      if (c.type === 'C') {
+        // Sample cubic bezier at multiple t values
+        for (let st = 0; st <= 1; st += 0.05) {
+          const pt = this._cubicAt(px, py, c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y, st);
+          const dist = Math.hypot(fx - pt.x, fy - pt.y);
+          if (dist < bestDist) { bestDist = dist; bestIdx = i; bestT = st; }
+        }
+        px = c.x; py = c.y;
+      }
+    }
+
+    // Only add if close enough to a path segment
+    const threshold = 20 / this.zoom;
+    if (bestIdx < 0 || bestDist > threshold) return;
+
+    const c = cmds[bestIdx];
+    // Find previous point
+    let prevX = 0, prevY = 0;
+    for (let i = bestIdx - 1; i >= 0; i--) {
+      const p = cmds[i];
+      if (p.type === 'M' || p.type === 'L' || p.type === 'C') {
+        prevX = p.x; prevY = p.y; break;
+      }
+    }
+
+    if (c.type === 'L') {
+      // Split line into two lines
+      const mx = prevX + bestT * (c.x - prevX);
+      const my = prevY + bestT * (c.y - prevY);
+      const newNode = { type: 'L', x: mx, y: my };
+      cmds.splice(bestIdx, 0, newNode);
+    } else if (c.type === 'C') {
+      // Split cubic bezier using de Casteljau
+      const t = bestT;
+      const p0x = prevX, p0y = prevY;
+      const p1x = c.cp1x, p1y = c.cp1y;
+      const p2x = c.cp2x, p2y = c.cp2y;
+      const p3x = c.x, p3y = c.y;
+
+      const q0x = p0x + t * (p1x - p0x), q0y = p0y + t * (p1y - p0y);
+      const q1x = p1x + t * (p2x - p1x), q1y = p1y + t * (p2y - p1y);
+      const q2x = p2x + t * (p3x - p2x), q2y = p2y + t * (p3y - p2y);
+      const r0x = q0x + t * (q1x - q0x), r0y = q0y + t * (q1y - q0y);
+      const r1x = q1x + t * (q2x - q1x), r1y = q1y + t * (q2y - q1y);
+      const sx = r0x + t * (r1x - r0x), sy = r0y + t * (r1y - r0y);
+
+      // First half
+      const first = { type: 'C', cp1x: q0x, cp1y: q0y, cp2x: r0x, cp2y: r0y, x: sx, y: sy };
+      // Second half
+      const second = { type: 'C', cp1x: r1x, cp1y: r1y, cp2x: q2x, cp2y: q2y, x: p3x, y: p3y };
+      cmds.splice(bestIdx, 1, first, second);
+    }
+
+    this.render();
+    this._notifyBBox();
+    this._notifyChange();
+  }
+
+  _cubicAt(x0, y0, x1, y1, x2, y2, x3, y3, t) {
+    const mt = 1 - t;
+    return {
+      x: mt*mt*mt*x0 + 3*mt*mt*t*x1 + 3*mt*t*t*x2 + t*t*t*x3,
+      y: mt*mt*mt*y0 + 3*mt*mt*t*y1 + 3*mt*t*t*y2 + t*t*t*y3,
+    };
   }
 
   // ─── Resize Handles ──────────────────────────────────────────────────────────
