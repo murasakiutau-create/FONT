@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>フォント識別ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f0f14; --surface: #1a1a24; --surface2: #24243a;
+  --border: #333355; --text: #e8e8f0; --text2: #9999bb;
+  --accent: #7c6ff7; --accent2: #a78bfa; --accent-glow: rgba(124,111,247,0.3);
+  --danger: #f77; --success: #6f7;
+}
+body { font-family: 'Segoe UI', 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+h1 { font-size: 1.6rem; font-weight: 700; }
+h2 { font-size: 1.1rem; font-weight: 600; color: var(--text2); }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { cursor: pointer; border: none; font-family: inherit; font-size: 0.9rem; }
+
+/* Header */
+.header { padding: 1.2rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; background: var(--surface); }
+.header h1 { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+/* Layout */
+.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; display: grid; gap: 1.5rem; }
+
+/* Upload Area */
+.upload-section { background: var(--surface); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); }
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: 10px; padding: 3rem 2rem;
+  text-align: center; transition: all 0.3s; cursor: pointer; position: relative;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-glow); }
+.drop-zone svg { width: 48px; height: 48px; fill: var(--text2); margin-bottom: 1rem; }
+.drop-zone p { color: var(--text2); margin: 0.3rem 0; }
+.drop-zone .hint { font-size: 0.8rem; color: var(--text2); opacity: 0.7; }
+#file-input { display: none; }
+.preview-container { display: none; margin-top: 1rem; position: relative; }
+.preview-container img { max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid var(--border); }
+.preview-actions { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
+.btn { padding: 0.5rem 1.2rem; border-radius: 8px; font-weight: 600; transition: all 0.2s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--danger); color: #000; }
+.btn-sm { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+
+/* OCR Progress */
+.ocr-progress { display: none; margin-top: 1rem; }
+.progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width 0.3s; }
+.progress-text { font-size: 0.8rem; color: var(--text2); margin-top: 0.4rem; }
+
+/* Comparison Text */
+.text-section { background: var(--surface); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); }
+.text-input-wrapper { display: flex; gap: 0.8rem; align-items: center; margin-top: 0.8rem; }
+#comparison-text { flex: 1; padding: 0.6rem 1rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1.1rem; font-family: inherit; }
+#comparison-text:focus { outline: none; border-color: var(--accent); }
+#font-size-slider { width: 100px; accent-color: var(--accent); }
+.font-size-label { font-size: 0.8rem; color: var(--text2); min-width: 40px; }
+
+/* Filters */
+.filter-section { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1rem; }
+.filter-btn { padding: 0.4rem 0.9rem; border-radius: 20px; background: var(--surface2); color: var(--text2); font-size: 0.8rem; border: 1px solid transparent; transition: all 0.2s; }
+.filter-btn:hover { border-color: var(--accent); color: var(--text); }
+.filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#font-search { padding: 0.4rem 0.9rem; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.8rem; width: 200px; }
+#font-search:focus { outline: none; border-color: var(--accent); }
+
+/* Font Grid */
+.font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.font-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 1rem 1.2rem; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+}
+.font-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 20px var(--accent-glow); }
+.font-card .font-name { font-size: 0.75rem; color: var(--text2); margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+.font-card .font-name .category-tag { font-size: 0.65rem; background: var(--surface2); padding: 0.15rem 0.5rem; border-radius: 10px; }
+.font-card .font-preview { font-size: 1.5rem; line-height: 1.4; word-break: break-all; min-height: 2.5rem; }
+.font-card .font-preview.loading { color: var(--text2); font-style: italic; font-size: 0.9rem; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 2rem; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;
+}
+.modal h2 { font-size: 1.3rem; color: var(--text); margin-bottom: 0.5rem; }
+.modal .modal-preview { font-size: 2.5rem; line-height: 1.5; padding: 1.5rem; background: var(--surface2); border-radius: 10px; margin: 1rem 0; word-break: break-all; }
+.modal .modal-info { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; font-size: 0.9rem; }
+.modal .modal-info dt { color: var(--text2); }
+.modal .modal-actions { display: flex; gap: 0.5rem; margin-top: 1.5rem; justify-content: flex-end; }
+.modal .close-btn { position: absolute; top: 1rem; right: 1rem; background: none; color: var(--text2); font-size: 1.5rem; }
+
+/* Side-by-side comparison */
+.compare-panel { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-top: 1rem; }
+.compare-panel.show { display: block; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.compare-side { padding: 1rem; background: var(--surface2); border-radius: 8px; text-align: center; }
+.compare-side .label { font-size: 0.75rem; color: var(--text2); margin-bottom: 0.5rem; }
+.compare-side canvas, .compare-side img { max-width: 100%; border-radius: 4px; }
+
+/* Font count */
+.font-count { font-size: 0.85rem; color: var(--text2); margin-top: 0.5rem; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header { padding: 1rem; }
+  .container { padding: 1rem; }
+  .font-grid { grid-template-columns: 1fr; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .text-input-wrapper { flex-wrap: wrap; }
+}
+
+/* Spinner */
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>フォント識別ツール</h1>
+  <span style="color: var(--text2); font-size: 0.85rem;">画像からフォントを特定</span>
+</div>
+
+<div class="container">
+  <!-- Upload Section -->
+  <div class="upload-section">
+    <h2>1. 画像をアップロード</h2>
+    <div class="drop-zone" id="drop-zone">
+      <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      <p>ここに画像をドロップ</p>
+      <p class="hint">またはクリックでファイル選択 / Ctrl+V で貼り付け</p>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+    <div class="preview-container" id="preview-container">
+      <img id="preview-image" alt="プレビュー">
+      <div class="preview-actions">
+        <button class="btn btn-primary" id="btn-ocr">テキストを抽出 (OCR)</button>
+        <button class="btn btn-secondary" id="btn-compare">画像と比較モード</button>
+        <button class="btn btn-danger btn-sm" id="btn-clear">クリア</button>
+      </div>
+    </div>
+    <div class="ocr-progress" id="ocr-progress">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-text" id="progress-text">OCR処理中...</div>
+    </div>
+  </div>
+
+  <!-- Text Section -->
+  <div class="text-section">
+    <h2>2. 比較テキスト</h2>
+    <div class="text-input-wrapper">
+      <input type="text" id="comparison-text" value="The quick brown fox jumps over the lazy dog" placeholder="比較するテキストを入力...">
+      <label class="font-size-label" id="size-label">24px</label>
+      <input type="range" id="font-size-slider" min="12" max="72" value="24">
+    </div>
+    <div class="filter-section">
+      <button class="filter-btn active" data-category="all">すべて</button>
+      <button class="filter-btn" data-category="sans-serif">サンセリフ</button>
+      <button class="filter-btn" data-category="serif">セリフ</button>
+      <button class="filter-btn" data-category="display">ディスプレイ</button>
+      <button class="filter-btn" data-category="handwriting">手書き</button>
+      <button class="filter-btn" data-category="monospace">等幅</button>
+      <input type="text" id="font-search" placeholder="フォント名で検索...">
+    </div>
+    <div class="font-count" id="font-count"></div>
+  </div>
+
+  <!-- Compare Panel -->
+  <div class="compare-panel" id="compare-panel">
+    <h2>画像との比較</h2>
+    <div class="compare-grid">
+      <div class="compare-side">
+        <div class="label">元画像</div>
+        <canvas id="compare-original"></canvas>
+      </div>
+      <div class="compare-side">
+        <div class="label" id="compare-font-label">フォントを選択してください</div>
+        <canvas id="compare-font"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Font Grid -->
+  <div class="font-grid" id="font-grid"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" style="position: relative;">
+    <button class="close-btn" id="modal-close">&times;</button>
+    <h2 id="modal-font-name"></h2>
+    <div class="modal-preview" id="modal-preview"></div>
+    <dl class="modal-info">
+      <dt>カテゴリ</dt><dd id="modal-category"></dd>
+      <dt>提供元</dt><dd>Google Fonts</dd>
+      <dt>リンク</dt><dd><a id="modal-link" href="#" target="_blank">Google Fontsで見る</a></dd>
+    </dl>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-close-btn">閉じる</button>
+      <button class="btn btn-primary" id="modal-compare-btn">この画像と比較</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Font database
+const FONTS = [
+  // Sans-serif
+  {name:"Roboto",category:"sans-serif"},{name:"Open Sans",category:"sans-serif"},{name:"Lato",category:"sans-serif"},
+  {name:"Montserrat",category:"sans-serif"},{name:"Poppins",category:"sans-serif"},{name:"Inter",category:"sans-serif"},
+  {name:"Nunito",category:"sans-serif"},{name:"Raleway",category:"sans-serif"},{name:"Ubuntu",category:"sans-serif"},
+  {name:"Nunito Sans",category:"sans-serif"},{name:"Work Sans",category:"sans-serif"},{name:"Rubik",category:"sans-serif"},
+  {name:"Fira Sans",category:"sans-serif"},{name:"Quicksand",category:"sans-serif"},{name:"Mulish",category:"sans-serif"},
+  {name:"Barlow",category:"sans-serif"},{name:"Manrope",category:"sans-serif"},{name:"Karla",category:"sans-serif"},
+  {name:"Josefin Sans",category:"sans-serif"},{name:"DM Sans",category:"sans-serif"},{name:"Cabin",category:"sans-serif"},
+  {name:"Oxygen",category:"sans-serif"},{name:"Overpass",category:"sans-serif"},{name:"Archivo",category:"sans-serif"},
+  {name:"Exo 2",category:"sans-serif"},{name:"Signika",category:"sans-serif"},{name:"Catamaran",category:"sans-serif"},
+  {name:"Assistant",category:"sans-serif"},{name:"Lexend",category:"sans-serif"},{name:"Plus Jakarta Sans",category:"sans-serif"},
+  {name:"Space Grotesk",category:"sans-serif"},{name:"Outfit",category:"sans-serif"},{name:"Sora",category:"sans-serif"},
+  {name:"Albert Sans",category:"sans-serif"},{name:"Be Vietnam Pro",category:"sans-serif"},
+  // Serif
+  {name:"Playfair Display",category:"serif"},{name:"Merriweather",category:"serif"},{name:"Lora",category:"serif"},
+  {name:"PT Serif",category:"serif"},{name:"Noto Serif",category:"serif"},{name:"Libre Baskerville",category:"serif"},
+  {name:"EB Garamond",category:"serif"},{name:"Crimson Text",category:"serif"},{name:"Bitter",category:"serif"},
+  {name:"Cormorant Garamond",category:"serif"},{name:"Domine",category:"serif"},{name:"Spectral",category:"serif"},
+  {name:"Cardo",category:"serif"},{name:"Arvo",category:"serif"},{name:"Rokkitt",category:"serif"},
+  {name:"Vollkorn",category:"serif"},{name:"Alegreya",category:"serif"},{name:"Zilla Slab",category:"serif"},
+  {name:"Source Serif 4",category:"serif"},{name:"IBM Plex Serif",category:"serif"},{name:"DM Serif Display",category:"serif"},
+  {name:"Fraunces",category:"serif"},{name:"Cormorant",category:"serif"},{name:"Literata",category:"serif"},
+  {name:"Bree Serif",category:"serif"},
+  // Display
+  {name:"Bebas Neue",category:"display"},{name:"Abril Fatface",category:"display"},{name:"Righteous",category:"display"},
+  {name:"Alfa Slab One",category:"display"},{name:"Lobster",category:"display"},{name:"Pacifico",category:"display"},
+  {name:"Passion One",category:"display"},{name:"Fredoka One",category:"display"},{name:"Bungee",category:"display"},
+  {name:"Monoton",category:"display"},{name:"Black Ops One",category:"display"},{name:"Bungee Shade",category:"display"},
+  {name:"Staatliches",category:"display"},{name:"Russo One",category:"display"},{name:"Orbitron",category:"display"},
+  {name:"Audiowide",category:"display"},{name:"Archivo Black",category:"display"},{name:"Fjalla One",category:"display"},
+  {name:"Anton",category:"display"},{name:"Titan One",category:"display"},{name:"Lilita One",category:"display"},
+  {name:"Secular One",category:"display"},{name:"Comfortaa",category:"display"},{name:"Righteous",category:"display"},
+  {name:"Concert One",category:"display"},
+  // Handwriting
+  {name:"Dancing Script",category:"handwriting"},{name:"Caveat",category:"handwriting"},{name:"Satisfy",category:"handwriting"},
+  {name:"Great Vibes",category:"handwriting"},{name:"Sacramento",category:"handwriting"},{name:"Kalam",category:"handwriting"},
+  {name:"Indie Flower",category:"handwriting"},{name:"Permanent Marker",category:"handwriting"},{name:"Shadows Into Light",category:"handwriting"},
+  {name:"Amatic SC",category:"handwriting"},{name:"Handlee",category:"handwriting"},{name:"Patrick Hand",category:"handwriting"},
+  {name:"Gloria Hallelujah",category:"handwriting"},{name:"Architects Daughter",category:"handwriting"},
+  {name:"Courgette",category:"handwriting"},{name:"Cookie",category:"handwriting"},{name:"Kaushan Script",category:"handwriting"},
+  {name:"Mali",category:"handwriting"},{name:"Covered By Your Grace",category:"handwriting"},{name:"Reenie Beanie",category:"handwriting"},
+  // Monospace
+  {name:"Fira Code",category:"monospace"},{name:"Source Code Pro",category:"monospace"},{name:"JetBrains Mono",category:"monospace"},
+  {name:"IBM Plex Mono",category:"monospace"},{name:"Roboto Mono",category:"monospace"},{name:"Space Mono",category:"monospace"},
+  {name:"Inconsolata",category:"monospace"},{name:"Ubuntu Mono",category:"monospace"},{name:"Courier Prime",category:"monospace"},
+  {name:"Anonymous Pro",category:"monospace"},{name:"Share Tech Mono",category:"monospace"},{name:"Overpass Mono",category:"monospace"},
+  {name:"DM Mono",category:"monospace"},{name:"Red Hat Mono",category:"monospace"},{name:"Martian Mono",category:"monospace"},
+];
+
+const CATEGORY_LABELS = {
+  'sans-serif': 'サンセリフ', 'serif': 'セリフ', 'display': 'ディスプレイ',
+  'handwriting': '手書き', 'monospace': '等幅'
+};
+
+// State
+let currentFilter = 'all';
+let currentSearch = '';
+let fontSize = 24;
+let uploadedImage = null;
+let comparisonText = 'The quick brown fox jumps over the lazy dog';
+let selectedFont = null;
+let fontsLoaded = new Set();
+let compareMode = false;
+
+// Elements
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const previewContainer = document.getElementById('preview-container');
+const previewImage = document.getElementById('preview-image');
+const ocrProgress = document.getElementById('ocr-progress');
+const progressFill = document.getElementById('progress-fill');
+const progressText = document.getElementById('progress-text');
+const comparisonInput = document.getElementById('comparison-text');
+const fontSizeSlider = document.getElementById('font-size-slider');
+const sizeLabel = document.getElementById('size-label');
+const fontGrid = document.getElementById('font-grid');
+const fontCountEl = document.getElementById('font-count');
+const modalOverlay = document.getElementById('modal-overlay');
+const comparePanel = document.getElementById('compare-panel');
+
+// Load Google Fonts
+function loadFonts(fonts) {
+  const families = fonts.map(f => f.name.replace(/ /g, '+')).join('&family=');
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${families}&display=swap`;
+  document.head.appendChild(link);
+  return new Promise(resolve => {
+    link.onload = () => {
+      fonts.forEach(f => fontsLoaded.add(f.name));
+      resolve();
+    };
+    link.onerror = resolve;
+    setTimeout(resolve, 5000);
+  });
+}
+
+// Load fonts in batches
+async function loadAllFonts() {
+  const batchSize = 30;
+  for (let i = 0; i < FONTS.length; i += batchSize) {
+    const batch = FONTS.slice(i, i + batchSize);
+    await loadFonts(batch);
+    renderGrid();
+  }
+}
+
+// File handling
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    uploadedImage = e.target.result;
+    previewImage.src = uploadedImage;
+    previewContainer.style.display = 'block';
+    dropZone.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFile(e.dataTransfer.files[0]);
+});
+
+document.addEventListener('paste', (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      handleFile(item.getAsFile());
+      break;
+    }
+  }
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  uploadedImage = null;
+  previewImage.src = '';
+  previewContainer.style.display = 'none';
+  dropZone.style.display = 'block';
+  ocrProgress.style.display = 'none';
+  comparePanel.classList.remove('show');
+  compareMode = false;
+});
+
+// OCR
+document.getElementById('btn-ocr').addEventListener('click', async () => {
+  if (!uploadedImage) return;
+  ocrProgress.style.display = 'block';
+  progressFill.style.width = '0%';
+  progressText.textContent = 'OCRエンジンを初期化中...';
+
+  try {
+    const worker = await Tesseract.createWorker('eng+jpn', 1, {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          const pct = Math.round(m.progress * 100);
+          progressFill.style.width = pct + '%';
+          progressText.textContent = `テキスト認識中... ${pct}%`;
+        } else {
+          progressText.textContent = m.status;
+        }
+      }
+    });
+    const { data } = await worker.recognize(uploadedImage);
+    await worker.terminate();
+
+    const text = data.text.trim();
+    if (text) {
+      comparisonInput.value = text;
+      comparisonText = text;
+      renderGrid();
+      progressText.textContent = `完了! ${text.length}文字を検出しました`;
+      progressFill.style.width = '100%';
+    } else {
+      progressText.textContent = 'テキストを検出できませんでした';
+    }
+  } catch (err) {
+    progressText.textContent = 'エラー: ' + err.message;
+  }
+});
+
+// Compare mode
+document.getElementById('btn-compare').addEventListener('click', () => {
+  if (!uploadedImage) return;
+  compareMode = !compareMode;
+  comparePanel.classList.toggle('show', compareMode);
+  if (compareMode) drawOriginalCanvas();
+});
+
+function drawOriginalCanvas() {
+  const canvas = document.getElementById('compare-original');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = Math.min(img.width, 500);
+    canvas.height = (img.height / img.width) * canvas.width;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  };
+  img.src = uploadedImage;
+}
+
+function drawFontCanvas(fontName) {
+  const canvas = document.getElementById('compare-font');
+  const ctx = canvas.getContext('2d');
+  const origCanvas = document.getElementById('compare-original');
+  canvas.width = origCanvas.width;
+  canvas.height = origCanvas.height;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000000';
+  ctx.font = `${fontSize}px "${fontName}"`;
+  ctx.textBaseline = 'top';
+
+  const words = comparisonText.split('');
+  let x = 10, y = 10;
+  for (const char of words) {
+    const w = ctx.measureText(char).width;
+    if (x + w > canvas.width - 10) { x = 10; y += fontSize * 1.4; }
+    ctx.fillText(char, x, y);
+    x += w;
+  }
+  document.getElementById('compare-font-label').textContent = fontName;
+}
+
+// Filters
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.category;
+    renderGrid();
+  });
+});
+
+document.getElementById('font-search').addEventListener('input', (e) => {
+  currentSearch = e.target.value.toLowerCase();
+  renderGrid();
+});
+
+comparisonInput.addEventListener('input', (e) => {
+  comparisonText = e.target.value;
+  renderGrid();
+});
+
+fontSizeSlider.addEventListener('input', (e) => {
+  fontSize = parseInt(e.target.value);
+  sizeLabel.textContent = fontSize + 'px';
+  renderGrid();
+});
+
+// Render font grid
+function renderGrid() {
+  const filtered = FONTS.filter(f => {
+    if (currentFilter !== 'all' && f.category !== currentFilter) return false;
+    if (currentSearch && !f.name.toLowerCase().includes(currentSearch)) return false;
+    return true;
+  });
+
+  fontCountEl.textContent = `${filtered.length} / ${FONTS.length} フォントを表示中`;
+
+  fontGrid.innerHTML = filtered.map(f => {
+    const loaded = fontsLoaded.has(f.name);
+    const style = loaded ? `font-family: '${f.name}', sans-serif; font-size: ${fontSize}px;` : '';
+    const text = loaded ? comparisonText : '読み込み中...';
+    const cls = loaded ? '' : ' loading';
+    return `<div class="font-card" data-font="${f.name}" data-category="${f.category}">
+      <div class="font-name"><span>${f.name}</span><span class="category-tag">${CATEGORY_LABELS[f.category]}</span></div>
+      <div class="font-preview${cls}" style="${style}">${text}</div>
+    </div>`;
+  }).join('');
+
+  // Add click handlers
+  fontGrid.querySelectorAll('.font-card').forEach(card => {
+    card.addEventListener('click', () => openModal(card.dataset.font, card.dataset.category));
+  });
+}
+
+// Modal
+function openModal(fontName, category) {
+  selectedFont = fontName;
+  document.getElementById('modal-font-name').textContent = fontName;
+  document.getElementById('modal-preview').style.fontFamily = `'${fontName}', sans-serif`;
+  document.getElementById('modal-preview').style.fontSize = (fontSize * 1.5) + 'px';
+  document.getElementById('modal-preview').textContent = comparisonText;
+  document.getElementById('modal-category').textContent = CATEGORY_LABELS[category];
+  document.getElementById('modal-link').href = `https://fonts.google.com/specimen/${fontName.replace(/ /g, '+')}`;
+  modalOverlay.classList.add('show');
+
+  if (compareMode && uploadedImage) drawFontCanvas(fontName);
+}
+
+document.getElementById('modal-close').addEventListener('click', () => modalOverlay.classList.remove('show'));
+document.getElementById('modal-close-btn').addEventListener('click', () => modalOverlay.classList.remove('show'));
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('show'); });
+
+document.getElementById('modal-compare-btn').addEventListener('click', () => {
+  if (!uploadedImage) { alert('まず画像をアップロードしてください'); return; }
+  compareMode = true;
+  comparePanel.classList.add('show');
+  drawOriginalCanvas();
+  if (selectedFont) drawFontCanvas(selectedFont);
+  modalOverlay.classList.remove('show');
+  comparePanel.scrollIntoView({ behavior: 'smooth' });
+});
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') modalOverlay.classList.remove('show');
+});
+
+// Init
+renderGrid();
+loadAllFonts();
+</script>
+</body>
+</html>
