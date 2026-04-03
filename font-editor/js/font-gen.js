@@ -197,8 +197,9 @@ function generateFontBuffer(project) {
   for (const [unicodeStr, glyph] of Object.entries(project.glyphs)) {
     const unicode = parseInt(unicodeStr);
     if (!glyph.pathData || glyph.pathData.length === 0) continue;
+    const fixedCmds = fixWindingForExport(glyph.pathData);
     const otPath = new opentype.Path();
-    for (const c of glyph.pathData) {
+    for (const c of fixedCmds) {
       if (c.type === 'M') otPath.moveTo(c.x, c.y);
       else if (c.type === 'L') otPath.lineTo(c.x, c.y);
       else if (c.type === 'C') otPath.bezierCurveTo(c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y);
