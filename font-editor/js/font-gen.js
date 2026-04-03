@@ -3,6 +3,59 @@
  * Converts FontProject data into a downloadable OTF font file.
  */
 
+/**
+ * Fix winding direction for font export (nonzero fill rule).
+ * Outer paths should be clockwise (positive area in font coords),
+ * inner holes should be counter-clockwise (negative area).
+ * Uses containment detection: if a subpath's bbox is inside another's, it's a hole.
+ */
+function fixWindingForExport(cmds) {
+  const subs = splitSubpaths(cmds);
+  if (subs.length <= 1) return cmds;
+
+  // Calculate bbox and winding area for each subpath
+  const subData = subs.map(sub => {
+    const b = getCmdsBounds(sub.cmds);
+    const area = windingArea(sub.cmds);
+    return { sub, bounds: b, area };
+  });
+
+  // Sort by area (largest first = outer paths first)
+  subData.sort((a, b) => Math.abs(b.area) - Math.abs(a.area));
+
+  // Determine if each subpath is inside another (= hole)
+  const result = [];
+  for (let i = 0; i < subData.length; i++) {
+    const sd = subData[i];
+    const bi = sd.bounds;
+    let isHole = false;
+
+    // Check if this subpath's bbox center is inside any larger subpath
+    const cx = bi.x + bi.w / 2, cy = bi.y + bi.h / 2;
+    for (let j = 0; j < i; j++) {
+      const bj = subData[j].bounds;
+      if (cx > bj.x && cx < bj.x + bj.w && cy > bj.y && cy < bj.y + bj.h) {
+        isHole = true;
+        break;
+      }
+    }
+
+    // For fonts (Y-up): outer = clockwise = negative windingArea
+    // hole = counter-clockwise = positive windingArea
+    let subCmds = sd.sub.cmds;
+    if (isHole) {
+      // Hole should have positive area (CCW in font coords)
+      if (sd.area < 0) subCmds = reverseCmds(subCmds);
+    } else {
+      // Outer should have negative area (CW in font coords)
+      if (sd.area > 0) subCmds = reverseCmds(subCmds);
+    }
+    result.push(...subCmds);
+  }
+
+  return result;
+}
+
 function generateAndDownloadFont(project, format = 'ttf') {
   if (typeof opentype === 'undefined') {
     alert('opentype.js not loaded!');
@@ -39,10 +92,12 @@ function generateAndDownloadFont(project, format = 'ttf') {
     const unicode = parseInt(unicodeStr);
     if (!glyph.pathData || glyph.pathData.length === 0) continue;
 
-    const otPath = new opentype.Path();
-    const cmds = glyph.pathData;
+    // Fix winding direction: outer paths clockwise, inner (holes) counter-clockwise
+    const fixedCmds = fixWindingForExport(glyph.pathData);
 
-    for (const c of cmds) {
+    const otPath = new opentype.Path();
+
+    for (const c of fixedCmds) {
       switch (c.type) {
         case 'M': otPath.moveTo(c.x, c.y); break;
         case 'L': otPath.lineTo(c.x, c.y); break;
