@@ -2086,41 +2086,113 @@ const App = {
   // ─── Experimental: Auto-Optimize ────────────────────────────────────────────
 
   _optimizeCmds(cmds, targetNodes) {
-    const origCmds = JSON.parse(JSON.stringify(cmds));
-    const tolerances = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 14, 18, 22, 30, 40];
-    let bestCmds = origCmds;
-    let bestScore = Infinity;
+    // Process each subpath separately, distribute node budget proportionally
+    const subs = splitSubpaths(cmds);
+    if (!subs.length) return cmds;
 
-    for (const tol of tolerances) {
-      let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
-      const nodeCount = simplified.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
-
-      if (nodeCount <= targetNodes && nodeCount >= 3) {
-        let fitted = fitSmoothBezier(simplified);
-        const fittedCount = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
-        // Score: prefer closer to target and similar to original
-        const score = this._comparePathSimilarity(fitted, origCmds) + Math.abs(fittedCount - targetNodes) * 0.5;
-        if (score < bestScore) {
-          bestScore = score;
-          bestCmds = fitted;
+    // Calculate total points and distribute budget
+    const subPoints = subs.map(sub => {
+      const pts = [];
+      let px = 0, py = 0;
+      for (const c of sub.cmds) {
+        if (c.type === 'M') { px = c.x; py = c.y; pts.push({ x: px, y: py }); }
+        else if (c.type === 'L') { px = c.x; py = c.y; pts.push({ x: px, y: py }); }
+        else if (c.type === 'C') {
+          // Sample curve at multiple points for accurate representation
+          for (let t = 0.1; t <= 1.0; t += 0.1) {
+            const mt = 1 - t;
+            pts.push({
+              x: mt*mt*mt*px + 3*mt*mt*t*c.cp1x + 3*mt*t*t*c.cp2x + t*t*t*c.x,
+              y: mt*mt*mt*py + 3*mt*mt*t*c.cp1y + 3*mt*t*t*c.cp2y + t*t*t*c.y,
+            });
+          }
+          px = c.x; py = c.y;
         }
       }
-    }
+      return { sub, pts, closed: sub.closed };
+    });
 
-    // If nothing found under target, try harder with the largest tolerance
-    if (bestScore === Infinity) {
-      for (const tol of tolerances.reverse()) {
-        let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
-        let fitted = fitSmoothBezier(simplified);
-        const count = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
-        if (count <= targetNodes + 10) {
-          bestCmds = fitted;
+    const totalPts = subPoints.reduce((s, sp) => s + sp.pts.length, 0);
+    // Reserve at least 3 nodes per subpath
+    const minPerSub = 3;
+    const reserved = subs.length * minPerSub;
+    const distributable = Math.max(0, targetNodes - reserved);
+
+    const result = [];
+    for (const sp of subPoints) {
+      // Allocate nodes proportionally
+      const ratio = totalPts > 0 ? sp.pts.length / totalPts : 1 / subs.length;
+      const budget = Math.max(minPerSub, Math.round(minPerSub + distributable * ratio));
+
+      // Use RDP with increasing tolerance until we're under budget
+      let bestPts = sp.pts;
+      for (let tol = 1; tol <= 500; tol *= 1.3) {
+        const simplified = this._rdpSimplify(sp.pts, tol);
+        if (simplified.length <= budget) {
+          bestPts = simplified;
           break;
         }
+        bestPts = simplified; // keep last attempt
       }
+
+      // If still over budget, just evenly sample
+      if (bestPts.length > budget) {
+        const sampled = [bestPts[0]];
+        const step = (bestPts.length - 1) / (budget - 1);
+        for (let i = 1; i < budget - 1; i++) {
+          sampled.push(bestPts[Math.round(i * step)]);
+        }
+        sampled.push(bestPts[bestPts.length - 1]);
+        bestPts = sampled;
+      }
+
+      // Fit smooth cubic bezier curves through the simplified points
+      if (bestPts.length < 2) continue;
+      result.push({ type: 'M', x: bestPts[0].x, y: bestPts[0].y });
+      if (bestPts.length === 2) {
+        result.push({ type: 'L', x: bestPts[1].x, y: bestPts[1].y });
+      } else {
+        const n = bestPts.length;
+        for (let i = 0; i < (sp.closed ? n : n - 1); i++) {
+          const p0 = bestPts[(i - 1 + n) % n];
+          const p1 = bestPts[i];
+          const p2 = bestPts[(i + 1) % n];
+          const p3 = bestPts[(i + 2) % n];
+          const cp1x = p1.x + (p2.x - p0.x) / 6;
+          const cp1y = p1.y + (p2.y - p0.y) / 6;
+          const cp2x = p2.x - (p3.x - p1.x) / 6;
+          const cp2y = p2.y - (p3.y - p1.y) / 6;
+          result.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x: p2.x, y: p2.y });
+        }
+      }
+      if (sp.closed) result.push({ type: 'Z' });
     }
 
-    return bestCmds;
+    return result;
+  },
+
+  _rdpSimplify(pts, epsilon) {
+    if (pts.length < 3) return pts;
+    let maxD = 0, idx = 0;
+    const first = pts[0], last = pts[pts.length - 1];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const dx = last.x - first.x, dy = last.y - first.y;
+      const len2 = dx * dx + dy * dy;
+      let d;
+      if (len2 === 0) {
+        d = Math.hypot(pts[i].x - first.x, pts[i].y - first.y);
+      } else {
+        const t = ((pts[i].x - first.x) * dx + (pts[i].y - first.y) * dy) / len2;
+        d = Math.hypot(pts[i].x - (first.x + t * dx), pts[i].y - (first.y + t * dy));
+      }
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (maxD > epsilon) {
+      const left = this._rdpSimplify(pts.slice(0, idx + 1), epsilon);
+      const right = this._rdpSimplify(pts.slice(idx), epsilon);
+      return [...left.slice(0, -1), ...right];
+    }
+    return [first, last];
   },
 
   _loadExpRef(file) {
