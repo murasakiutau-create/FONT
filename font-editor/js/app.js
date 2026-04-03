@@ -325,8 +325,19 @@ const App = {
 
         // Fit to font space
         const fitted = this._fitToFontSpace(allCmds);
+        let finalCmds = fitted.cmds;
         const char = String.fromCodePoint(unicode);
-        const aw = fitted.advanceWidth;
+
+        // Auto-optimize if enabled
+        const autoOpt = document.getElementById('import-auto-optimize')?.checked;
+        if (autoOpt) {
+          const targetNodes = parseInt(document.getElementById('import-target-nodes')?.value) || 25;
+          finalCmds = this._optimizeCmds(finalCmds, targetNodes);
+        }
+
+        const finalB = getCmdsBounds(finalCmds);
+        const rsb = this.project.defaultRsb || 50;
+        const aw = autoOpt && finalB.w > 0 ? Math.round(finalB.x + finalB.w + rsb) : fitted.advanceWidth;
 
         this.project.glyphs[unicode] = {
           unicode,
@@ -334,7 +345,7 @@ const App = {
           advanceWidth: aw,
           lsb: this.project.defaultLsb,
           rsb: this.project.defaultRsb,
-          pathData: fitted.cmds,
+          pathData: finalCmds,
         };
 
         this._refreshGlyphGrid();
@@ -602,6 +613,14 @@ const App = {
     document.getElementById('font-file-input')?.addEventListener('change', e => {
       const file = e.target.files[0];
       if (file) this._importFontFile(file);
+    });
+
+    // Auto-optimize toggle in import dialog
+    document.getElementById('import-auto-optimize')?.addEventListener('change', e => {
+      document.getElementById('import-optimize-options').style.display = e.target.checked ? 'block' : 'none';
+    });
+    document.getElementById('import-target-nodes')?.addEventListener('input', e => {
+      document.getElementById('import-target-val').textContent = e.target.value;
     });
 
     // SVG file inputs (still needed)
@@ -1464,11 +1483,17 @@ const App = {
             else if (c.type === 'Z') cmds.push({ type: 'Z' });
           }
           if (!cmds.length) continue;
+          let finalCmds = cmds;
+          const autoOpt = document.getElementById('import-auto-optimize')?.checked;
+          if (autoOpt) {
+            const targetNodes = parseInt(document.getElementById('import-target-nodes')?.value) || 25;
+            finalCmds = this._optimizeCmds(cmds, targetNodes);
+          }
           this.project.glyphs[g.unicode] = {
             unicode: g.unicode,
             char: String.fromCodePoint(g.unicode),
             advanceWidth: g.advanceWidth || 600,
-            pathData: cmds,
+            pathData: finalCmds,
           };
           count++;
         }
@@ -2059,6 +2084,44 @@ const App = {
   },
 
   // ─── Experimental: Auto-Optimize ────────────────────────────────────────────
+
+  _optimizeCmds(cmds, targetNodes) {
+    const origCmds = JSON.parse(JSON.stringify(cmds));
+    const tolerances = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 14, 18, 22, 30, 40];
+    let bestCmds = origCmds;
+    let bestScore = Infinity;
+
+    for (const tol of tolerances) {
+      let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
+      const nodeCount = simplified.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+
+      if (nodeCount <= targetNodes && nodeCount >= 3) {
+        let fitted = fitSmoothBezier(simplified);
+        const fittedCount = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+        // Score: prefer closer to target and similar to original
+        const score = this._comparePathSimilarity(fitted, origCmds) + Math.abs(fittedCount - targetNodes) * 0.5;
+        if (score < bestScore) {
+          bestScore = score;
+          bestCmds = fitted;
+        }
+      }
+    }
+
+    // If nothing found under target, try harder with the largest tolerance
+    if (bestScore === Infinity) {
+      for (const tol of tolerances.reverse()) {
+        let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
+        let fitted = fitSmoothBezier(simplified);
+        const count = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+        if (count <= targetNodes + 10) {
+          bestCmds = fitted;
+          break;
+        }
+      }
+    }
+
+    return bestCmds;
+  },
 
   _loadExpRef(file) {
     const reader = new FileReader();

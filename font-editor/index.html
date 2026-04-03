@@ -646,6 +646,21 @@ abcdefghijklmnopqrstuvwxyz
           <strong data-i18n="ed_import_font">OTF / TTF / WOFF から取り込み</strong>
           <span data-i18n="ed_import_font_d">既存のフォントファイルからグリフをインポートします。</span>
         </button>
+        <div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="import-auto-optimize">
+            <label for="import-auto-optimize" style="font-size:12px;color:#555;cursor:pointer">
+              <strong>自動最適化</strong> — ノード数を自動削減してスムーズベジェに変換
+            </label>
+          </div>
+          <div id="import-optimize-options" style="display:none;margin-top:8px;padding-left:24px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#888">
+              <label>目標ノード数:</label>
+              <input type="range" id="import-target-nodes" min="8" max="50" step="1" value="25" style="width:100px;accent-color:#000">
+              <span id="import-target-val" style="min-width:20px;font-weight:bold;color:#000">25</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
