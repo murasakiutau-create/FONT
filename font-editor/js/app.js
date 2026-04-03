@@ -1709,62 +1709,110 @@ const App = {
       if (!glyph.pathData || !glyph.pathData.length) continue;
       const cmds = glyph.pathData;
       const subs = splitSubpaths(cmds);
+
       // Check open paths
       for (let i = 0; i < subs.length; i++) {
         if (!subs[i].closed) {
-          results.push({ unicode, char, issue: `サブパス${i + 1}: 開いたパス (Zが不足)` });
+          results.push({ unicode, char, issue: `「${char}」のパス${i + 1}/${subs.length}: 閉じていない（Zが不足）`, autofix: 'close', subIdx: i });
         }
       }
-      // Check duplicate points
-      let px = null, py = null;
-      for (let i = 0; i < cmds.length; i++) {
-        const c = cmds[i];
-        if (c.type === 'Z') { px = null; py = null; continue; }
-        if (c.x !== undefined && px !== null) {
-          if (Math.abs(c.x - px) < 0.1 && Math.abs(c.y - py) < 0.1) {
-            results.push({ unicode, char, issue: `ポイント${i}: 重複点` });
+
+      // Check winding: if multiple subpaths, check outer/hole relationship
+      if (subs.length > 1) {
+        const subData = subs.map((s, idx) => ({
+          idx, bounds: getCmdsBounds(s.cmds), area: windingArea(s.cmds)
+        }));
+        subData.sort((a, b) => Math.abs(b.area) - Math.abs(a.area));
+        for (let i = 0; i < subData.length; i++) {
+          const sd = subData[i];
+          const cx = sd.bounds.x + sd.bounds.w / 2, cy = sd.bounds.y + sd.bounds.h / 2;
+          let isHole = false;
+          for (let j = 0; j < i; j++) {
+            const bj = subData[j].bounds;
+            if (cx > bj.x && cx < bj.x + bj.w && cy > bj.y && cy < bj.y + bj.h) {
+              isHole = true; break;
+            }
+          }
+          const shouldBeNeg = !isHole; // outer = negative area in font coords
+          if ((shouldBeNeg && sd.area > 0) || (!shouldBeNeg && sd.area < 0)) {
+            const role = isHole ? '穴' : '外側';
+            results.push({ unicode, char, issue: `「${char}」のパス${sd.idx + 1}（${role}）: 巻き方向が逆`, autofix: 'winding' });
           }
         }
-        if (c.x !== undefined) { px = c.x; py = c.y; }
       }
-      // Check winding direction
-      for (let i = 0; i < subs.length; i++) {
-        const area = windingArea(subs[i].cmds);
-        if (area < 0) {
-          results.push({ unicode, char, issue: `サブパス${i + 1}: 逆方向の巻き` });
-        }
-      }
+
       // Check very small segments
       let prevX = 0, prevY = 0;
+      let smallCount = 0;
       for (const c of cmds) {
         if (c.type === 'M') { prevX = c.x; prevY = c.y; continue; }
         if (c.type === 'Z') continue;
         if (c.x !== undefined) {
-          const dist = Math.sqrt((c.x - prevX) ** 2 + (c.y - prevY) ** 2);
-          if (dist < 1 && dist > 0) {
-            results.push({ unicode, char, issue: `非常に小さいセグメント (${dist.toFixed(2)}u)` });
-          }
+          const dist = Math.hypot(c.x - prevX, c.y - prevY);
+          if (dist < 1 && dist > 0) smallCount++;
           prevX = c.x; prevY = c.y;
         }
       }
+      if (smallCount > 0) {
+        results.push({ unicode, char, issue: `「${char}」: 極小セグメント${smallCount}個`, autofix: 'cleanup' });
+      }
     }
+
     // Render results
     const container = document.getElementById('validation-results');
     if (!container) return;
     container.innerHTML = '';
     if (results.length === 0) {
-      container.innerHTML = '<div style="color:var(--text3);padding:6px">問題は見つかりませんでした ✓</div>';
+      container.innerHTML = '<div style="color:#7a9b7e;padding:6px;font-weight:bold">問題は見つかりませんでした ✓</div>';
       this._notify('バリデーション完了: 問題なし');
       return;
     }
+
+    // Auto-fix all button
+    const fixAllBtn = document.createElement('button');
+    fixAllBtn.className = 'panel-btn btn-green';
+    fixAllBtn.style.cssText = 'text-align:center;justify-content:center;margin-bottom:6px';
+    fixAllBtn.textContent = `全て自動修正 (${results.length}件)`;
+    fixAllBtn.addEventListener('click', () => this._autoFixAll());
+    container.appendChild(fixAllBtn);
+
     for (const r of results) {
       const div = document.createElement('div');
       div.className = 'validation-item';
-      div.innerHTML = `<span class="validation-char">${r.char}</span><span class="validation-issue">${r.issue}</span>`;
+      div.innerHTML = `<span class="validation-issue">${r.issue}</span>`;
+      div.style.cursor = 'pointer';
       div.addEventListener('click', () => this.selectChar(r.unicode));
       container.appendChild(div);
     }
     this._notify(`${results.length}件の問題が見つかりました`);
+  },
+
+  _autoFixAll() {
+    this._saveCurrentGlyph();
+    let fixCount = 0;
+    for (const [unicodeStr, glyph] of Object.entries(this.project.glyphs)) {
+      if (!glyph.pathData || !glyph.pathData.length) continue;
+      // Fix winding direction
+      const fixed = fixWindingForExport(glyph.pathData);
+      // Close open paths
+      const subs = splitSubpaths(fixed);
+      const closed = [];
+      for (const sub of subs) {
+        closed.push(...sub.cmds);
+        if (!sub.closed) closed.push({ type: 'Z' });
+      }
+      // Cleanup small segments
+      const cleaned = cleanupCmds(closed, 1);
+      if (JSON.stringify(cleaned) !== JSON.stringify(glyph.pathData)) {
+        glyph.pathData = cleaned;
+        fixCount++;
+      }
+    }
+    if (this.currentUnicode != null && this.project.glyphs[this.currentUnicode]) {
+      this.editor.loadGlyph(this.project.glyphs[this.currentUnicode]);
+    }
+    this._notify(`${fixCount}グリフを自動修正しました`);
+    this._validateAllGlyphs(); // Re-validate
   },
 
   // ─── Ligatures ──────────────────────────────────────────────────────────────
