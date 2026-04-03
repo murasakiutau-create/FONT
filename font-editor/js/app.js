@@ -810,6 +810,28 @@ const App = {
       this._validateAllGlyphs();
     });
 
+    // ── Experimental: auto-optimize ──
+    this._expRefCmds = null;
+    const expDrop = document.getElementById('exp-ref-drop');
+    const expFileInput = document.getElementById('exp-ref-file');
+    expDrop?.addEventListener('click', () => { expFileInput.value = ''; expFileInput.click(); });
+    expDrop?.addEventListener('dragover', e => { e.preventDefault(); expDrop.style.borderColor = '#000'; });
+    expDrop?.addEventListener('dragleave', () => { expDrop.style.borderColor = '#ccc'; });
+    expDrop?.addEventListener('drop', e => {
+      e.preventDefault(); expDrop.style.borderColor = '#ccc';
+      const file = e.dataTransfer.files[0];
+      if (file) this._loadExpRef(file);
+    });
+    expFileInput?.addEventListener('change', e => {
+      if (e.target.files[0]) this._loadExpRef(e.target.files[0]);
+    });
+    document.getElementById('exp-target-nodes')?.addEventListener('input', e => {
+      document.getElementById('exp-target-val').textContent = e.target.value;
+    });
+    document.getElementById('exp-optimize-btn')?.addEventListener('click', () => {
+      this._runAutoOptimize();
+    });
+
     // ── Copy/Paste buttons ──
     document.getElementById('copy-glyph-btn')?.addEventListener('click', () => this._copyGlyph());
     document.getElementById('paste-glyph-btn')?.addEventListener('click', () => this._pasteGlyph());
@@ -1891,6 +1913,162 @@ const App = {
     this.editor.render();
     this._renderCustomGuidesList();
     this._notify(`Y=${y} にガイドラインを追加しました`);
+  },
+
+  // ─── Experimental: Auto-Optimize ────────────────────────────────────────────
+
+  _loadExpRef(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const paths = extractPathsFromSVG(e.target.result);
+        if (!paths.length) { this._notify('SVGにパスが見つかりません', 'error'); return; }
+        let allCmds = [];
+        for (const p of paths) allCmds = allCmds.concat(p);
+        this._expRefCmds = allCmds;
+        document.getElementById('exp-ref-status').textContent = `✓ 元SVG読込済み (${allCmds.filter(c=>c.type!=='Z').length}ノード)`;
+        document.getElementById('exp-ref-drop').textContent = file.name;
+        document.getElementById('exp-ref-drop').style.borderColor = '#7a9b7e';
+      } catch (err) {
+        this._notify('SVG読込エラー: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  _runAutoOptimize() {
+    if (!this.editor || !this.editor.glyph || !this.editor.glyph.pathData.length) {
+      this._notify('グリフにパスがありません', 'error');
+      return;
+    }
+    this._pushUndo(); // Save state before optimization
+
+    const targetNodes = parseInt(document.getElementById('exp-target-nodes')?.value) || 20;
+    const resultEl = document.getElementById('exp-result');
+    resultEl.textContent = '最適化中...';
+
+    // Use requestAnimationFrame to not block UI
+    requestAnimationFrame(() => {
+      try {
+        const origCmds = JSON.parse(JSON.stringify(this.editor.glyph.pathData));
+        // Reference: either loaded SVG or the current glyph itself
+        const refCmds = this._expRefCmds
+          ? this._fitRefToCurrentSpace(this._expRefCmds)
+          : JSON.parse(JSON.stringify(origCmds));
+
+        // Step 1: Simplify to near target node count using increasing tolerance
+        let bestCmds = origCmds;
+        let bestScore = Infinity;
+        const tolerances = [0.5, 1, 1.5, 2, 3, 4, 5, 7, 10, 14, 18, 22];
+
+        for (const tol of tolerances) {
+          let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
+          const nodeCount = simplified.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+
+          if (nodeCount <= targetNodes && nodeCount >= 4) {
+            // Step 2: Fit smooth bezier curves to the simplified path
+            let fitted = fitSmoothBezier(simplified);
+            const fittedCount = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+
+            // If still over target, simplify a bit more
+            if (fittedCount > targetNodes) {
+              const extraTol = tol * 1.2;
+              simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), extraTol);
+              fitted = fitSmoothBezier(simplified);
+            }
+
+            // Step 3: Score against reference by sampling points
+            const score = this._comparePathSimilarity(fitted, refCmds);
+            if (score < bestScore) {
+              bestScore = score;
+              bestCmds = fitted;
+            }
+          }
+        }
+
+        // If we never found a good fit under target, use the best tolerance that gets close
+        if (bestScore === Infinity) {
+          for (const tol of tolerances) {
+            let simplified = simplifyCmds(JSON.parse(JSON.stringify(origCmds)), tol);
+            let fitted = fitSmoothBezier(simplified);
+            const nodeCount = fitted.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+            if (nodeCount <= targetNodes + 5) {
+              bestCmds = fitted;
+              break;
+            }
+          }
+        }
+
+        // Apply result
+        this.editor.glyph.pathData = bestCmds;
+        this.editor.render();
+        this.editor._notifyBBox();
+        this.editor._notifyChange();
+
+        const finalCount = bestCmds.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+        const origCount = origCmds.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+        resultEl.innerHTML = `完了! <strong>${origCount}</strong> → <strong>${finalCount}</strong> ノード` +
+          (bestScore < Infinity ? ` (類似度スコア: ${bestScore.toFixed(1)})` : '');
+        this._notify(`${origCount} → ${finalCount} ノードに最適化しました`);
+      } catch (err) {
+        console.error(err);
+        resultEl.textContent = 'エラー: ' + err.message;
+        this._notify('最適化に失敗しました', 'error');
+      }
+    });
+  },
+
+  _fitRefToCurrentSpace(refCmds) {
+    // Scale reference SVG to match current glyph's bounding box
+    const currentB = getCmdsBounds(this.editor.glyph.pathData);
+    const refB = getCmdsBounds(refCmds);
+    if (refB.w === 0 || refB.h === 0 || currentB.w === 0) return refCmds;
+
+    const sx = currentB.w / refB.w;
+    const sy = currentB.h / refB.h;
+    let fitted = transformCmds(JSON.parse(JSON.stringify(refCmds)), -refB.x, -refB.y, 1, 1);
+    fitted = transformCmds(fitted, 0, 0, sx, sy);
+    fitted = transformCmds(fitted, currentB.x, currentB.y, 1, 1);
+    return fitted;
+  },
+
+  _comparePathSimilarity(cmdsA, cmdsB) {
+    // Sample points along both paths and compute average distance
+    const samplePath = (cmds) => {
+      const pts = [];
+      let px = 0, py = 0;
+      for (const c of cmds) {
+        if (c.type === 'M') { px = c.x; py = c.y; pts.push({ x: px, y: py }); }
+        else if (c.type === 'L') { px = c.x; py = c.y; pts.push({ x: px, y: py }); }
+        else if (c.type === 'C') {
+          for (let t = 0.25; t <= 1; t += 0.25) {
+            const mt = 1 - t;
+            pts.push({
+              x: mt*mt*mt*px + 3*mt*mt*t*c.cp1x + 3*mt*t*t*c.cp2x + t*t*t*c.x,
+              y: mt*mt*mt*py + 3*mt*mt*t*c.cp1y + 3*mt*t*t*c.cp2y + t*t*t*c.y,
+            });
+          }
+          px = c.x; py = c.y;
+        }
+      }
+      return pts;
+    };
+
+    const ptsA = samplePath(cmdsA);
+    const ptsB = samplePath(cmdsB);
+    if (!ptsA.length || !ptsB.length) return Infinity;
+
+    // For each point in A, find nearest point in B
+    let totalDist = 0;
+    for (const a of ptsA) {
+      let minD = Infinity;
+      for (const b of ptsB) {
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < minD) minD = d;
+      }
+      totalDist += minD;
+    }
+    return totalDist / ptsA.length;
   },
 
   _renderCustomGuidesList() {

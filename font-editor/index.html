@@ -414,6 +414,27 @@ abcdefghijklmnopqrstuvwxyz
         <div class="section-hdr">バリデーション</div>
         <button class="panel-btn" id="validate-btn">全グリフを検証</button>
         <div id="validation-results" style="margin-top:6px;max-height:200px;overflow-y:auto;font-size:10px"></div>
+
+        <div class="section-hdr" style="color:#c07070">⚠ 実験機能</div>
+        <p style="font-size:10px;color:#999;margin-bottom:8px;line-height:1.5">
+          ノード数を自動で削減しつつ、元のSVGにできるだけ近い形状を維持します。<br>
+          結果が意図通りでない場合はCtrl+Zで戻せます。
+        </p>
+
+        <div class="section-hdr" style="font-size:8px;margin-top:4px">元SVG（比較用）</div>
+        <div id="exp-ref-drop" style="border:2px dashed #ccc;border-radius:6px;padding:12px;text-align:center;color:#aaa;font-size:11px;cursor:pointer;margin-bottom:8px">
+          元のSVGをドロップ or クリックして開く
+        </div>
+        <input type="file" id="exp-ref-file" accept=".svg,image/svg+xml" class="hidden-input">
+        <div id="exp-ref-status" style="font-size:10px;color:#7a9b7e;margin-bottom:8px"></div>
+
+        <div class="slider-row">
+          <label>目標ノード数</label>
+          <input type="range" id="exp-target-nodes" min="8" max="30" step="1" value="20">
+          <span class="slider-val" id="exp-target-val">20</span>
+        </div>
+        <button class="panel-btn btn-orange" id="exp-optimize-btn" style="text-align:center;justify-content:center">自動最適化を実行</button>
+        <div id="exp-result" style="font-size:10px;color:#555;margin-top:6px"></div>
       </div>
 
       <!-- ── Ligatures Tab ── -->
