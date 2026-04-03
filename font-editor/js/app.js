@@ -101,6 +101,24 @@ const App = {
       setInterval(() => this._autoSave(), 30000);
     }
 
+    // Auto-backup: download project file every 5 minutes
+    if (this.projectId) {
+      this._backupCounter = 0;
+      setInterval(() => {
+        this._backupCounter++;
+        this._autoBackup();
+      }, 300000); // 5 minutes
+    }
+
+    // Warn before leaving with unsaved data
+    window.addEventListener('beforeunload', (e) => {
+      this._autoSave();
+      if (this.editor && this.editor.glyph && Object.keys(this.project.glyphs).length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
     // Bind zoom slider
     const zSlider = document.getElementById('zoom-slider');
     if (zSlider) {
@@ -1302,7 +1320,30 @@ const App = {
     this._saveCurrentGlyph();
     try {
       localStorage.setItem('svgfontmaker_data_' + this.projectId, JSON.stringify(this.project));
+      const now = new Date();
+      const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+      const el = document.getElementById('save-status');
+      if (el) el.textContent = `✓ 保存済 ${ts}`;
     } catch (e) { console.warn('Auto-save failed:', e); }
+  },
+
+  _autoBackup() {
+    if (!this.projectId) return;
+    if (Object.keys(this.project.glyphs).length === 0) return;
+    this._saveCurrentGlyph();
+    try {
+      const data = JSON.stringify(this.project);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const now = new Date();
+      const ts = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+      a.href = url;
+      a.download = `${this.project.name || 'MyFont'}_backup_${ts}.fontproj`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this._notify('自動バックアップを保存しました');
+    } catch (e) { console.warn('Auto-backup failed:', e); }
   },
 
   _loadProject(file) {
