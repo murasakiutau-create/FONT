@@ -60,6 +60,7 @@
       <span data-i18n="ed_settings">設定</span>
     </button>
     <button class="header-btn lang-toggle" onclick="I18N.toggle()" style="font-size:11px;padding:4px 8px">EN</button>
+    <div id="editor-auth-area" style="display:flex;align-items:center;gap:6px;margin-left:4px"></div>
   </header>
 
   <!-- ─── Hidden file inputs ────────────────────────────────────────────── -->
@@ -670,6 +671,8 @@ abcdefghijklmnopqrstuvwxyz
 </div><!-- #app -->
 
 <!-- ─── Scripts ───────────────────────────────────────────────────────────── -->
+<!-- Firebase (ES module, loads async) -->
+<script type="module" src="../js/firebase-app.js"></script>
 <!-- opentype.js from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
 <!-- App scripts (order matters: path-ops first, then editor, then font-gen, then app) -->

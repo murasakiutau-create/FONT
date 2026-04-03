@@ -239,18 +239,74 @@
     </div>
   </div>
 
+  <!-- Firebase module -->
+  <script type="module" src="js/firebase-app.js"></script>
+
   <script>
     const MAX_PROJECTS = 30;
     const STORAGE_KEY = 'svgfontmaker_projects';
     let editingId = null;
+    let currentUser = null;
+    let cloudProjects = []; // projects loaded from Firestore
 
-    // ─── Storage ───
-    function loadProjects() {
+    // ─── localStorage Storage (fallback) ───
+    function loadLocalProjects() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
       catch { return []; }
     }
-    function saveProjects(projects) {
+    function saveLocalProjects(projects) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    }
+
+    // ─── Unified project loading ───
+    function loadProjects() {
+      if (currentUser && cloudProjects.length > 0) return cloudProjects;
+      return loadLocalProjects();
+    }
+
+    // ─── Auth UI ───
+    function updateAuthUI(user) {
+      const loginBtn = document.getElementById('login-btn');
+      const userInfo = document.getElementById('user-info');
+      const cloudMsg = document.getElementById('cloud-msg');
+
+      if (user) {
+        loginBtn.style.display = 'none';
+        userInfo.style.display = 'flex';
+        document.getElementById('user-avatar').src = user.photoURL || '';
+        document.getElementById('user-name').textContent = user.displayName || user.email || '';
+        cloudMsg.textContent = 'クラウドに保存中';
+        cloudMsg.classList.add('logged-in');
+      } else {
+        loginBtn.style.display = 'flex';
+        userInfo.style.display = 'none';
+        cloudMsg.textContent = 'ログインするとクラウドに保存されます';
+        cloudMsg.classList.remove('logged-in');
+      }
+    }
+
+    // ─── Load projects from Firestore ───
+    async function loadCloudProjects() {
+      if (!currentUser) return;
+      try {
+        const projects = await FirebaseApp.listProjects(currentUser.uid);
+        // Convert Firestore docs to project list format
+        cloudProjects = projects.map(p => ({
+          id: p.id,
+          name: p.name || 'Untitled',
+          author: p.author || '',
+          style: p.style || 'Regular',
+          created: p.created || new Date().toISOString(),
+        }));
+        // Also sync to localStorage as cache
+        saveLocalProjects(cloudProjects);
+        render();
+      } catch (e) {
+        console.warn('Failed to load cloud projects:', e);
+        // Fall back to localStorage
+        cloudProjects = [];
+        render();
+      }
     }
 
     // ─── Render ───
@@ -347,7 +403,7 @@
       editingId = null;
     }
 
-    function submitModal() {
+    async function submitModal() {
       const name = document.getElementById('m-name').value.trim();
       if (!name) { document.getElementById('m-name').focus(); return; }
       const author = document.getElementById('m-author').value.trim();
@@ -360,7 +416,7 @@
           p.name = name;
           p.author = author;
           p.style = style;
-          // Also update the project data if it exists
+          // Also update the project data in localStorage
           const dataKey = 'svgfontmaker_data_' + editingId;
           try {
             const data = JSON.parse(localStorage.getItem(dataKey));
@@ -371,17 +427,18 @@
               localStorage.setItem(dataKey, JSON.stringify(data));
             }
           } catch {}
+          // Update in Firestore if logged in
+          if (currentUser) {
+            try {
+              await FirebaseApp.saveProject(currentUser.uid, editingId, { name, author, style });
+            } catch (e) { console.warn('Cloud update failed:', e); }
+          }
         }
       } else {
         if (projects.length >= MAX_PROJECTS) return;
         const id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-        projects.push({
-          id,
-          name,
-          author,
-          style,
-          created: new Date().toISOString(),
-        });
+        const created = new Date().toISOString();
+        projects.push({ id, name, author, style, created });
         // Create default project data
         const defaultData = {
           name,
@@ -404,9 +461,19 @@
           ligatures: [],
         };
         localStorage.setItem('svgfontmaker_data_' + id, JSON.stringify(defaultData));
+        // Save to Firestore if logged in
+        if (currentUser) {
+          try {
+            await FirebaseApp.saveProject(currentUser.uid, id, {
+              ...defaultData,
+              created,
+            });
+          } catch (e) { console.warn('Cloud save failed:', e); }
+        }
       }
 
-      saveProjects(projects);
+      saveLocalProjects(projects);
+      if (currentUser) cloudProjects = projects;
       closeModal();
       render();
     }
@@ -415,12 +482,19 @@
       openModal(id);
     }
 
-    function deleteProject(id) {
+    async function deleteProject(id) {
       if (!confirm('このプロジェクトを削除しますか？')) return;
       let projects = loadProjects();
       projects = projects.filter(p => p.id !== id);
-      saveProjects(projects);
+      saveLocalProjects(projects);
       localStorage.removeItem('svgfontmaker_data_' + id);
+      // Delete from Firestore if logged in
+      if (currentUser) {
+        try {
+          await FirebaseApp.deleteProject(currentUser.uid, id);
+          cloudProjects = projects;
+        } catch (e) { console.warn('Cloud delete failed:', e); }
+      }
       render();
     }
 
@@ -434,6 +508,27 @@
     document.getElementById('m-name').addEventListener('keydown', e => {
       if (e.key === 'Enter') submitModal();
     });
+
+    // ─── Firebase Auth listener ───
+    // Wait for FirebaseApp to be available (loaded as module)
+    function initFirebaseAuth() {
+      if (typeof FirebaseApp === 'undefined') {
+        setTimeout(initFirebaseAuth, 100);
+        return;
+      }
+      document.getElementById('login-btn').style.display = 'flex';
+      FirebaseApp.onAuthChange(async (user) => {
+        currentUser = user;
+        updateAuthUI(user);
+        if (user) {
+          await loadCloudProjects();
+        } else {
+          cloudProjects = [];
+          render();
+        }
+      });
+    }
+    initFirebaseAuth();
 
     render();
   </script>

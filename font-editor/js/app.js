@@ -71,9 +71,13 @@ const App = {
         if (saved) {
           const data = JSON.parse(saved);
           this.project = { ...this.project, ...data };
+          this._projectCreated = data.created || new Date().toISOString();
         }
       } catch (e) { console.warn('Failed to load project:', e); }
     }
+
+    // Try to load from Firestore when Firebase becomes available
+    this._initFirebaseLoad();
 
     this.editor = new GlyphEditor(document.getElementById('editor-svg'), {
       upm: this.project.upm,
@@ -96,18 +100,14 @@ const App = {
     this.selectChar(65); // Start with 'A'
     this._updateSettingsForm();
 
-    // Auto-save every 30 seconds
+    // Auto-save every 30 seconds (localStorage)
     if (this.projectId) {
       setInterval(() => this._autoSave(), 30000);
     }
 
-    // Auto-backup: download project file every 5 minutes
+    // Auto-save to Firestore every 30 seconds (debounced separately)
     if (this.projectId) {
-      this._backupCounter = 0;
-      setInterval(() => {
-        this._backupCounter++;
-        this._autoBackup();
-      }, 300000); // 5 minutes
+      setInterval(() => this._autoSaveCloud(), 30000);
     }
 
     // Warn before leaving with unsaved data
@@ -1327,23 +1327,76 @@ const App = {
     } catch (e) { console.warn('Auto-save failed:', e); }
   },
 
-  _autoBackup() {
+  async _autoSaveCloud() {
     if (!this.projectId) return;
-    if (Object.keys(this.project.glyphs).length === 0) return;
+    if (typeof FirebaseApp === 'undefined') return;
+    const user = FirebaseApp.getCurrentUser();
+    if (!user) return;
     this._saveCurrentGlyph();
     try {
-      const data = JSON.stringify(this.project);
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const el = document.getElementById('save-status');
+      if (el) el.textContent = '☁ 同期中...';
+      // Build save data: project metadata + full data
+      const saveData = {
+        ...this.project,
+        created: this._projectCreated || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
       const now = new Date();
-      const ts = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
-      a.href = url;
-      a.download = `${this.project.name || 'MyFont'}_backup_${ts}.fontproj`;
-      a.click();
-      URL.revokeObjectURL(url);
-      this._notify('自動バックアップを保存しました');
-    } catch (e) { console.warn('Auto-backup failed:', e); }
+      const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+      if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
+    } catch (e) {
+      console.warn('Cloud auto-save failed:', e);
+      const el = document.getElementById('save-status');
+      if (el) el.textContent = '☁ 同期エラー';
+    }
+  },
+
+  _initFirebaseLoad() {
+    if (typeof FirebaseApp === 'undefined') {
+      setTimeout(() => this._initFirebaseLoad(), 200);
+      return;
+    }
+    FirebaseApp.onAuthChange(async (user) => {
+      this._updateEditorAuthUI(user);
+      if (!user || !this.projectId) return;
+      try {
+        const cloudData = await FirebaseApp.loadProject(user.uid, this.projectId);
+        if (cloudData && cloudData.glyphs) {
+          // Cloud data is newer or local has no glyphs: use cloud
+          const localGlyphCount = Object.keys(this.project.glyphs || {}).length;
+          const cloudGlyphCount = Object.keys(cloudData.glyphs || {}).length;
+          if (cloudGlyphCount > 0 && (localGlyphCount === 0 || (cloudData.updatedAt && cloudData.updatedAt > (this.project.updatedAt || '')))) {
+            this.project = { ...this.project, ...cloudData };
+            this._projectCreated = cloudData.created || this._projectCreated;
+            // Also update localStorage cache
+            localStorage.setItem('svgfontmaker_data_' + this.projectId, JSON.stringify(this.project));
+            this._buildGlyphGrid();
+            this._updateSettingsForm();
+            this.currentUnicode = null;
+            this.selectChar(65);
+            const el = document.getElementById('save-status');
+            if (el) el.textContent = '☁ クラウドから読み込み済';
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load from cloud:', e);
+      }
+    });
+  },
+
+  _updateEditorAuthUI(user) {
+    const area = document.getElementById('editor-auth-area');
+    if (!area) return;
+    if (user) {
+      area.innerHTML = `
+        <img src="${user.photoURL || ''}" alt="" style="width:24px;height:24px;border-radius:50%;border:2px solid #000">
+        <span style="font-size:11px;font-weight:600;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${user.displayName || ''}</span>
+      `;
+    } else {
+      area.innerHTML = '';
+    }
   },
 
   _loadProject(file) {
