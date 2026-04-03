@@ -1733,8 +1733,9 @@ const App = {
               isHole = true; break;
             }
           }
-          const shouldBeNeg = !isHole; // outer = negative area in font coords
-          if ((shouldBeNeg && sd.area > 0) || (!shouldBeNeg && sd.area < 0)) {
+          // OTF/CFF: outer = positive area (CCW), hole = negative area (CW)
+          const shouldBePos = !isHole;
+          if ((shouldBePos && sd.area < 0) || (!shouldBePos && sd.area > 0)) {
             const role = isHole ? '穴' : '外側';
             results.push({ unicode, char, issue: `「${char}」のパス${sd.idx + 1}（${role}）: 巻き方向が逆`, autofix: 'winding' });
           }

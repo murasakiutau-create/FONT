@@ -40,15 +40,16 @@ function fixWindingForExport(cmds) {
       }
     }
 
-    // For fonts (Y-up): outer = clockwise = negative windingArea
-    // hole = counter-clockwise = positive windingArea
+    // OTF/CFF (Y-up coords):
+    //   outer = counter-clockwise = POSITIVE windingArea
+    //   hole  = clockwise         = NEGATIVE windingArea
     let subCmds = sd.sub.cmds;
     if (isHole) {
-      // Hole should have positive area (CCW in font coords)
-      if (sd.area < 0) subCmds = reverseCmds(subCmds);
-    } else {
-      // Outer should have negative area (CW in font coords)
+      // Hole should have negative area (CW)
       if (sd.area > 0) subCmds = reverseCmds(subCmds);
+    } else {
+      // Outer should have positive area (CCW)
+      if (sd.area < 0) subCmds = reverseCmds(subCmds);
     }
     result.push(...subCmds);
   }
