@@ -18,6 +18,7 @@ const CHAR_GROUPS = [
   { label: 'カタカナ濁音', chars: 'ガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ' },
   { label: 'カタカナ小文字', chars: 'ァィゥェォッャュョヮヴ' },
   { label: 'カタカナ記号', chars: 'ーヽヾ' },
+  { label: '日本語記号', chars: '、。「」・『』〜…' },
 ];
 
 const ALL_CHARS = [];
