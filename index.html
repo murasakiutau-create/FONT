@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG Font Maker</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#fff;color:#000;line-height:1.6}
+    header{border-bottom:3px solid #000;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+    .header-left h1{font-size:32px;font-weight:900;letter-spacing:4px;text-transform:uppercase}
+    .header-left p{font-size:13px;color:#666;letter-spacing:1px}
+    .lang-toggle{background:#000;color:#fff;border:none;padding:6px 14px;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px}
+    .lang-toggle:hover{background:#333}
+    .hero{max-width:800px;margin:0 auto;padding:60px 24px;text-align:center}
+    .hero h2{font-size:28px;font-weight:800;margin-bottom:16px}
+    .hero p{font-size:15px;color:#444;margin-bottom:24px;line-height:1.8;white-space:pre-line}
+    .hero-btn{display:inline-block;background:#000;color:#fff;padding:14px 48px;border:none;border-radius:6px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;letter-spacing:1px;transition:background .15s}
+    .hero-btn:hover{background:#333}
+    .features{max-width:900px;margin:0 auto;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px}
+    .feature-card{border:2px solid #000;border-radius:8px;padding:24px}
+    .feature-card h3{font-size:15px;font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px}
+    .feature-card p{font-size:13px;color:#555;line-height:1.6}
+    .howto{max-width:800px;margin:0 auto;padding:0 24px 60px}
+    .howto h2{font-size:22px;font-weight:800;margin-bottom:20px;text-align:center;text-transform:uppercase;letter-spacing:2px}
+    .howto-steps{display:flex;flex-direction:column;gap:16px}
+    .howto-step{display:flex;align-items:flex-start;gap:16px;border:1px solid #ddd;border-radius:8px;padding:16px 20px}
+    .step-num{flex-shrink:0;width:36px;height:36px;background:#000;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px}
+    .step-text h4{font-size:14px;font-weight:700;margin-bottom:2px}
+    .step-text p{font-size:12px;color:#666}
+    footer{border-top:2px solid #000;padding:20px 24px;text-align:center;font-size:12px;color:#999;display:flex;justify-content:center;gap:24px;align-items:center}
+    footer a{color:#666;text-decoration:none}
+    footer a:hover{text-decoration:underline;color:#000}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1 data-i18n="site_title">SVG Font Maker</h1>
+    <p data-i18n="site_subtitle">ブラウザだけでオリジナルフォントを作成</p>
+  </div>
+  <button class="lang-toggle" onclick="I18N.toggle()">EN</button>
+</header>
+
+<section class="hero">
+  <h2 data-i18n="hero_title">あなただけのフォントを作ろう</h2>
+  <p data-i18n="hero_desc">SVG Font Makerは、ブラウザ上で動作するフォント作成ツールです。
+SVGファイルのインポート、ノード編集、カーニング、リガチャなど
+プロ仕様の機能を備えながら、誰でも簡単に使えます。
+ひらがな・カタカナにも完全対応。OTF形式でエクスポートできます。</p>
+  <a href="projects.html" class="hero-btn" data-i18n="hero_btn">プロジェクトを始める →</a>
+</section>
+
+<section class="features">
+  <div class="feature-card"><h3 data-i18n="feat_svg">SVGインポート</h3><p data-i18n="feat_svg_d">SVGファイルをドラッグ&ドロップで簡単にインポート。一括取込やテンプレートにも対応しています。</p></div>
+  <div class="feature-card"><h3 data-i18n="feat_node">ノード編集 & ペンツール</h3><p data-i18n="feat_node_d">ベジェ曲線のノードを直接編集。ペンツールで新しいパスをゼロから描くこともできます。</p></div>
+  <div class="feature-card"><h3 data-i18n="feat_jp">日本語対応</h3><p data-i18n="feat_jp_d">ひらがな・カタカナ（濁音・小文字含む）に完全対応。お手本フォントを参照しながら作成できます。</p></div>
+  <div class="feature-card"><h3 data-i18n="feat_kern">カーニング & ベアリング</h3><p data-i18n="feat_kern_d">手動・自動カーニング、サイドベアリングの個別/一括/自動調整。しきい値スライダーでリアルタイムプレビュー。</p></div>
+  <div class="feature-card"><h3 data-i18n="feat_tpl">テンプレート</h3><p data-i18n="feat_tpl_d">カリグラフィー用テンプレートをダウンロードして手書き文字を描画。再アップロードで自動反映。</p></div>
+  <div class="feature-card"><h3 data-i18n="feat_otf">OTF エクスポート</h3><p data-i18n="feat_otf_d">完成したフォントをOTF形式でダウンロード。メタデータやライセンス情報も設定可能。</p></div>
+</section>
+
+<section class="howto">
+  <h2 data-i18n="how_title">使い方</h2>
+  <div class="howto-steps">
+    <div class="howto-step"><div class="step-num">1</div><div class="step-text"><h4 data-i18n="how1_t">プロジェクトを作成</h4><p data-i18n="how1_d">「プロジェクトを始める」ボタンからプロジェクトを新規作成します。最大30個まで保存できます。</p></div></div>
+    <div class="howto-step"><div class="step-num">2</div><div class="step-text"><h4 data-i18n="how2_t">文字をデザイン</h4><p data-i18n="how2_d">SVGファイルをインポートするか、ペンツールで直接描画。テンプレートを使った手書きも可能です。</p></div></div>
+    <div class="howto-step"><div class="step-num">3</div><div class="step-text"><h4 data-i18n="how3_t">調整 & プレビュー</h4><p data-i18n="how3_d">ノード編集、カーニング、ベアリングを調整。ウォーターフォールプレビューで複数サイズを確認。</p></div></div>
+    <div class="howto-step"><div class="step-num">4</div><div class="step-text"><h4 data-i18n="how4_t">フォントをエクスポート</h4><p data-i18n="how4_d">OTF形式でダウンロード。PCやスマホにインストールして使えます。</p></div></div>
+  </div>
+</section>
+
+<footer>
+  <span>SVG Font Maker</span>
+  <a href="terms.html" data-i18n="terms_link">利用規約</a>
+</footer>
+
+<script src="js/i18n.js"></script>
+</body>
+</html>
