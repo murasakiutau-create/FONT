@@ -141,6 +141,15 @@ const App = {
     window.addEventListener('resize', () => {
       if (this.editor && this.currentUnicode != null) this.editor.render();
     });
+
+    // Mobile: tap panel title to collapse/expand glyph grid
+    document.querySelector('#left-panel .panel-title')?.addEventListener('click', () => {
+      document.getElementById('left-panel')?.classList.toggle('collapsed');
+    });
+    // Start collapsed on mobile
+    if (window.innerWidth <= 768) {
+      document.getElementById('left-panel')?.classList.add('collapsed');
+    }
   },
 
   // ─── Glyph Grid ─────────────────────────────────────────────────────────────
