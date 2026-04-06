@@ -487,3 +487,120 @@ input[type=file].hidden-input { display: none; }
   .glyph-cell { width: 28px; height: 28px; }
   .glyph-char { font-size: 14px; }
 }
+
+/* ─── Mobile / Smartphone (<768px) ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  html, body { overflow: auto; }
+  #app { height: auto; min-height: 100vh; overflow: visible; }
+
+  /* Header: scrollable row */
+  #header {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    gap: 6px; padding: 0 8px; height: 40px;
+  }
+  #header .logo { font-size: 13px; letter-spacing: 1px; margin-right: 2px; }
+  .header-btn { padding: 3px 7px; font-size: 11px; }
+  .header-btn svg { width: 12px; height: 12px; }
+  #font-name-display { font-size: 12px; min-width: 50px; }
+  .header-btn span { display: none; }
+
+  /* Main layout: vertical stack */
+  #main-body { flex-direction: column; overflow: visible; }
+
+  /* Left panel: horizontal glyph bar */
+  #left-panel {
+    width: 100%; height: auto; max-height: none;
+    flex-shrink: 0; border-right: none; border-bottom: 1px solid var(--border);
+    flex-direction: column; position: relative;
+  }
+  .panel-title { padding: 4px 8px; font-size: 9px; }
+  #glyph-search-wrap { padding: 3px 6px; }
+  #glyph-search { font-size: 11px; padding: 3px 6px; }
+  #glyph-grid {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding: 4px; gap: 2px; flex: none;
+  }
+  #glyph-grid .glyph-group-header { display: none; }
+  #glyph-grid .glyph-row {
+    display: flex; flex-wrap: nowrap; gap: 2px; margin-bottom: 0;
+  }
+  .glyph-cell { width: 30px; height: 30px; flex-shrink: 0; }
+  .glyph-char { font-size: 14px; }
+
+  /* Mobile toggle for left panel collapse */
+  #left-panel.collapsed #glyph-grid,
+  #left-panel.collapsed #glyph-search-wrap { display: none; }
+
+  /* Center panel: full width */
+  #center-panel { flex: none; width: 100%; min-height: 50vh; }
+
+  /* Tab row */
+  #tab-row { height: 32px; }
+  .main-tab-btn { padding: 6px 12px; font-size: 11px; }
+
+  /* Toolbar: scrollable */
+  #toolbar {
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    gap: 4px; padding: 0 6px; height: 34px;
+  }
+  .tool-btn { width: 26px; height: 26px; font-size: 12px; }
+  .tool-btn svg { width: 13px; height: 13px; }
+  .zoom-group { flex-shrink: 0; }
+  #zoom-slider { width: 50px; }
+  #zoom-label { font-size: 10px; min-width: 30px; }
+  .glyph-nav { flex-shrink: 0; }
+  #current-char-label { font-size: 16px !important; min-width: 20px !important; }
+  #current-unicode-label { font-size: 9px !important; }
+
+  /* Editor container: fill width, reasonable height */
+  #editor-container { min-height: 300px; touch-action: none; }
+
+  /* Status bar */
+  #status-bar { flex-wrap: wrap; height: auto; padding: 4px 8px; gap: 6px; }
+  #status-bar .status-item:last-child { display: none; }
+
+  /* Right panel: below editor */
+  #right-panel {
+    width: 100%; height: auto; flex-shrink: 0;
+    border-left: none; border-top: 1px solid var(--border);
+  }
+  .rtab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .rtab-btn { flex: none; padding: 6px 8px; font-size: 8px; white-space: nowrap; }
+  .rtab-content { padding: 8px; }
+
+  /* Settings panel: full width */
+  #settings-panel { width: 100vw; right: -100vw; }
+  #settings-panel.open { right: 0; }
+  .settings-grid { grid-template-columns: 1fr 1fr; }
+  .s-row2 { grid-template-columns: 1fr; }
+
+  /* Modals: full width */
+  .modal-box { width: 95vw; max-width: 95vw; }
+  .modal-choice-btn { padding: 10px 12px; }
+
+  /* Preview */
+  .preview-controls { flex-direction: column; }
+  .preview-field textarea { width: 100%; min-width: 0; }
+  .preview-field input[type=text] { min-width: 0; width: 100%; }
+
+  /* Upload hint */
+  #upload-hint .hint-icon { font-size: 32px; }
+  #upload-hint .hint-text { font-size: 11px; }
+
+  /* Notification: centered bottom */
+  .notification { left: 10px; right: 10px; max-width: none; text-align: center; }
+
+  /* Image trace dialog */
+  #image-trace-dialog .modal-box { width: 95vw; max-width: 95vw; }
+  #trace-preview-canvas { max-width: 100%; }
+}
+
+/* Small phones (<400px) */
+@media (max-width: 400px) {
+  #header { gap: 4px; padding: 0 4px; height: 36px; }
+  .header-btn { padding: 2px 5px; font-size: 10px; }
+  #header .sep { display: none; }
+  .glyph-cell { width: 26px; height: 26px; }
+  #editor-container { min-height: 250px; }
+  .rtab-btn { font-size: 7px; padding: 5px 6px; }
+}
