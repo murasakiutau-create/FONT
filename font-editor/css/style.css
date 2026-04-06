@@ -480,6 +480,10 @@ input[type=file].hidden-input { display: none; }
 /* ─── Custom guide line in SVG ─────────────────────────────────────────── */
 .guide-custom { stroke: rgba(0,0,0,0.3); stroke-dasharray: 6 3; }
 
+/* ─── Image Trace Dialog ───────────────────────────────────────────────── */
+#image-trace-dialog .modal-box { width: 480px; }
+#trace-preview-canvas { image-rendering: pixelated; }
+
 /* ─── Responsive adjustments ────────────────────────────────────────────── */
 @media (max-width: 900px) {
   #left-panel { width: 150px; }
