@@ -1369,18 +1369,43 @@ const App = {
 
   // ─── Project Save/Load ────────────────────────────────────────────────────────
 
-  _saveProject() {
+  async _saveProject() {
     this._saveCurrentGlyph();
-    // Save to localStorage if project has an ID
-    this._autoSave();
-    // Also download as file
+    this._autoSave(); // localStorage
+
+    // Cloud save
+    if (this.projectId && typeof FirebaseApp !== 'undefined') {
+      const user = FirebaseApp.getCurrentUser();
+      if (user) {
+        try {
+          const el = document.getElementById('save-status');
+          if (el) el.textContent = '☁ 保存中...';
+          const saveData = {
+            ...this.project,
+            created: this._projectCreated || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
+          const now = new Date();
+          const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+          if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
+          this._notify('クラウドに保存しました');
+          return;
+        } catch (e) {
+          console.warn('Cloud save failed:', e);
+          this._notify('クラウド保存に失敗。ファイルとして保存します', 'error');
+        }
+      }
+    }
+
+    // Fallback: download as file (not logged in or cloud failed)
     const data = JSON.stringify(this.project, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${this.project.name}.fontproj`;
     a.click(); URL.revokeObjectURL(url);
-    this._notify('プロジェクトを保存しました');
+    this._notify('ファイルとして保存しました');
   },
 
   _autoSave() {
