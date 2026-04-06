@@ -497,90 +497,117 @@ input[type=file].hidden-input { display: none; }
   html, body { overflow: auto; }
   #app { height: auto; min-height: 100vh; overflow: visible; }
 
-  /* Header: scrollable row */
+  /* Header: compact scrollable row */
   #header {
     flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    gap: 6px; padding: 0 8px; height: 40px;
+    gap: 4px; padding: 0 6px; height: 44px;
   }
-  #header .logo { font-size: 13px; letter-spacing: 1px; margin-right: 2px; }
-  .header-btn { padding: 3px 7px; font-size: 11px; }
-  .header-btn svg { width: 12px; height: 12px; }
-  #font-name-display { font-size: 12px; min-width: 50px; }
-  .header-btn span { display: none; }
+  #header .logo { font-size: 12px; letter-spacing: 1px; margin-right: 2px; }
+  .header-btn {
+    padding: 6px 8px; font-size: 11px;
+    min-width: 36px; min-height: 36px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .header-btn svg { width: 16px; height: 16px; }
+  #font-name-display { font-size: 11px; min-width: 40px; }
+  .header-btn span[data-i18n] { display: none; }
+  #header .sep { display: none; }
+  #back-to-projects { min-width: 32px; min-height: 32px; font-size: 18px !important; }
 
   /* Main layout: vertical stack */
   #main-body { flex-direction: column; overflow: visible; }
 
-  /* Left panel: horizontal glyph bar */
+  /* Left panel: collapsible glyph grid */
   #left-panel {
     width: 100%; height: auto; max-height: none;
-    flex-shrink: 0; border-right: none; border-bottom: 1px solid var(--border);
+    flex-shrink: 0; border-right: none; border-bottom: 2px solid var(--border);
     flex-direction: column; position: relative;
   }
-  .panel-title { padding: 4px 8px; font-size: 9px; }
-  #glyph-search-wrap { padding: 3px 6px; }
-  #glyph-search { font-size: 11px; padding: 3px 6px; }
+  .panel-title {
+    padding: 6px 10px; font-size: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title::after { content: '▼'; font-size: 8px; color: var(--text3); }
+  #left-panel.collapsed .panel-title::after { content: '▶'; }
+  #glyph-search-wrap { padding: 4px 8px; }
+  #glyph-search { font-size: 12px; padding: 6px 8px; }
   #glyph-grid {
-    display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    padding: 4px; gap: 2px; flex: none;
+    display: flex; flex-wrap: wrap; overflow-y: auto;
+    padding: 4px 6px; gap: 2px; max-height: 120px;
   }
-  #glyph-grid .glyph-group-header { display: none; }
+  #glyph-grid .glyph-group-header {
+    width: 100%; font-size: 8px; padding: 2px 4px; margin-top: 2px;
+  }
   #glyph-grid .glyph-row {
-    display: flex; flex-wrap: nowrap; gap: 2px; margin-bottom: 0;
+    display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 0;
   }
-  .glyph-cell { width: 30px; height: 30px; flex-shrink: 0; }
-  .glyph-char { font-size: 14px; }
+  .glyph-cell { width: 32px; height: 32px; flex-shrink: 0; }
+  .glyph-char { font-size: 15px; }
 
-  /* Mobile toggle for left panel collapse */
+  /* Collapsed state */
   #left-panel.collapsed #glyph-grid,
   #left-panel.collapsed #glyph-search-wrap { display: none; }
 
   /* Center panel: full width */
-  #center-panel { flex: none; width: 100%; min-height: 50vh; }
+  #center-panel { flex: none; width: 100%; min-height: 45vh; }
 
   /* Tab row */
-  #tab-row { height: 32px; }
-  .main-tab-btn { padding: 6px 12px; font-size: 11px; }
+  #tab-row { height: 36px; }
+  .main-tab-btn { padding: 8px 16px; font-size: 12px; }
 
-  /* Toolbar: scrollable */
+  /* Toolbar: scrollable with larger tap targets */
   #toolbar {
     flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
-    gap: 4px; padding: 0 6px; height: 34px;
+    gap: 4px; padding: 0 6px; height: 40px;
   }
-  .tool-btn { width: 26px; height: 26px; font-size: 12px; }
-  .tool-btn svg { width: 13px; height: 13px; }
+  .tool-btn { width: 32px; height: 32px; font-size: 14px; }
+  .tool-btn svg { width: 16px; height: 16px; }
   .zoom-group { flex-shrink: 0; }
-  #zoom-slider { width: 50px; }
-  #zoom-label { font-size: 10px; min-width: 30px; }
+  .zoom-btn { width: 28px; height: 28px; }
+  #zoom-slider { width: 60px; }
+  #zoom-label { font-size: 10px; min-width: 32px; }
   .glyph-nav { flex-shrink: 0; }
-  #current-char-label { font-size: 16px !important; min-width: 20px !important; }
+  .nav-btn { width: 32px; height: 32px; font-size: 18px; }
+  #current-char-label { font-size: 18px !important; min-width: 24px !important; }
   #current-unicode-label { font-size: 9px !important; }
 
-  /* Editor container: fill width, reasonable height */
+  /* Editor container: fill width */
   #editor-container { min-height: 300px; touch-action: none; }
 
   /* Status bar */
-  #status-bar { flex-wrap: wrap; height: auto; padding: 4px 8px; gap: 6px; }
+  #status-bar { flex-wrap: wrap; height: auto; padding: 4px 8px; gap: 4px; font-size: 10px; }
   #status-bar .status-item:last-child { display: none; }
 
-  /* Right panel: below editor */
+  /* Right panel: tabs at bottom, fixed height */
   #right-panel {
-    width: 100%; height: auto; flex-shrink: 0;
-    border-left: none; border-top: 1px solid var(--border);
+    width: 100%; height: auto; max-height: 45vh; flex-shrink: 0;
+    border-left: none; border-top: 2px solid var(--border);
+    overflow-y: auto;
   }
-  .rtab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
-  .rtab-btn { flex: none; padding: 6px 8px; font-size: 8px; white-space: nowrap; }
-  .rtab-content { padding: 8px; }
+  .rtab-bar {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap; position: sticky; top: 0; z-index: 10; background: var(--bg2);
+  }
+  .rtab-btn { flex: none; padding: 8px 10px; font-size: 10px; white-space: nowrap; }
+  .rtab-content { padding: 10px; }
+  .input-row { gap: 4px; }
+  .num-input { font-size: 13px; padding: 6px 8px; }
+  .panel-btn { padding: 8px 10px; font-size: 12px; }
+  .slider-row { gap: 4px; }
+  .slider-row label { font-size: 10px; min-width: 50px; }
 
-  /* Settings panel: full width */
+  /* Settings panel: full width overlay */
   #settings-panel { width: 100vw; right: -100vw; }
   #settings-panel.open { right: 0; }
   .settings-grid { grid-template-columns: 1fr 1fr; }
   .s-row2 { grid-template-columns: 1fr; }
+  .settings-field input, .settings-field select { font-size: 14px; padding: 8px; }
 
-  /* Modals: full width */
+  /* Modals: full width, larger tap targets */
   .modal-box { width: 95vw; max-width: 95vw; }
-  .modal-choice-btn { padding: 10px 12px; }
+  .modal-choice-btn { padding: 14px; }
+  .modal-choice-btn strong { font-size: 14px; }
+  .modal-choice-btn span { font-size: 12px; }
 
   /* Preview */
   .preview-controls { flex-direction: column; }
@@ -589,22 +616,30 @@ input[type=file].hidden-input { display: none; }
 
   /* Upload hint */
   #upload-hint .hint-icon { font-size: 32px; }
-  #upload-hint .hint-text { font-size: 11px; }
+  #upload-hint .hint-text { font-size: 12px; }
 
-  /* Notification: centered bottom */
-  .notification { left: 10px; right: 10px; max-width: none; text-align: center; }
+  /* Notification: full width bottom */
+  .notification { left: 8px; right: 8px; bottom: 12px; max-width: none; text-align: center; font-size: 12px; }
 
   /* Image trace dialog */
   #image-trace-dialog .modal-box { width: 95vw; max-width: 95vw; }
   #trace-preview-canvas { max-width: 100%; }
+
+  /* Kerning */
+  .kern-pair-row { gap: 4px; }
+  .kern-char { font-size: 22px; min-height: 28px; }
+  .kern-table td, .kern-table th { padding: 6px 8px; }
 }
 
 /* Small phones (<400px) */
 @media (max-width: 400px) {
-  #header { gap: 4px; padding: 0 4px; height: 36px; }
-  .header-btn { padding: 2px 5px; font-size: 10px; }
-  #header .sep { display: none; }
-  .glyph-cell { width: 26px; height: 26px; }
+  #header { gap: 3px; padding: 0 4px; height: 40px; }
+  .header-btn { padding: 4px 6px; min-width: 32px; min-height: 32px; }
+  .glyph-cell { width: 28px; height: 28px; }
+  .glyph-char { font-size: 13px; }
+  #glyph-grid { max-height: 100px; }
   #editor-container { min-height: 250px; }
-  .rtab-btn { font-size: 7px; padding: 5px 6px; }
+  .rtab-btn { font-size: 9px; padding: 6px 8px; }
+  .tool-btn { width: 28px; height: 28px; }
+  .nav-btn { width: 28px; height: 28px; }
 }
