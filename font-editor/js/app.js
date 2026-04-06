@@ -622,6 +622,39 @@ const App = {
       if (file) this._importFontFile(file);
     });
 
+    // Image import
+    document.getElementById('import-image')?.addEventListener('click', () => {
+      document.getElementById('import-dialog').style.display = 'none';
+      const inp = document.getElementById('image-file-input');
+      inp.value = '';
+      inp.click();
+    });
+    document.getElementById('image-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) this._importImage(file);
+    });
+
+    // Image trace dialog
+    document.getElementById('image-trace-close')?.addEventListener('click', () => {
+      document.getElementById('image-trace-dialog').style.display = 'none';
+    });
+    document.getElementById('image-trace-dialog')?.addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+    });
+    document.getElementById('trace-threshold')?.addEventListener('input', e => {
+      document.getElementById('trace-threshold-val').textContent = e.target.value;
+      this._updateTracePreview();
+    });
+    document.getElementById('trace-invert')?.addEventListener('change', () => {
+      this._updateTracePreview();
+    });
+    document.getElementById('trace-smooth')?.addEventListener('change', () => {
+      this._updateTracePreview();
+    });
+    document.getElementById('trace-import-btn')?.addEventListener('click', () => {
+      this._importTracedImage();
+    });
+
     // Auto-optimize toggle in import dialog
     document.getElementById('import-auto-optimize')?.addEventListener('change', e => {
       document.getElementById('import-optimize-options').style.display = e.target.checked ? 'block' : 'none';
@@ -2677,6 +2710,323 @@ const App = {
       }
     };
     reader.readAsText(file);
+  },
+  // ─── Image Tracing ─────────────────────────────────────────────────────────
+
+  _traceImageData: null, // { img, width, height }
+
+  _importImage(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        this._traceImageData = { img, width: img.width, height: img.height };
+        document.getElementById('image-trace-dialog').style.display = 'flex';
+        this._updateTracePreview();
+      };
+      img.onerror = () => {
+        this._notify('画像の読み込みに失敗しました', 'error');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  },
+
+  _updateTracePreview() {
+    if (!this._traceImageData) return;
+    const { img, width, height } = this._traceImageData;
+    const canvas = document.getElementById('trace-preview-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Fit image into 300x300 canvas
+    const maxSize = 300;
+    const scale = Math.min(maxSize / width, maxSize / height, 1);
+    const w = Math.round(width * scale);
+    const h = Math.round(height * scale);
+    canvas.width = w;
+    canvas.height = h;
+
+    // Draw and get pixel data
+    ctx.drawImage(img, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
+
+    const threshold = parseInt(document.getElementById('trace-threshold')?.value) || 128;
+    const invert = document.getElementById('trace-invert')?.checked || false;
+
+    // Convert to binary
+    const binary = this._thresholdImage(imageData, threshold, invert);
+
+    // Draw binary preview
+    const previewData = ctx.createImageData(w, h);
+    for (let i = 0; i < binary.length; i++) {
+      const v = binary[i] ? 0 : 255;
+      previewData.data[i * 4] = v;
+      previewData.data[i * 4 + 1] = v;
+      previewData.data[i * 4 + 2] = v;
+      previewData.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(previewData, 0, 0);
+
+    // Trace contours and draw them as overlay
+    const contours = this._traceContours(binary, w, h);
+    ctx.strokeStyle = '#c07070';
+    ctx.lineWidth = 1;
+    for (const contour of contours) {
+      if (contour.length < 3) continue;
+      ctx.beginPath();
+      ctx.moveTo(contour[0].x, contour[0].y);
+      for (let i = 1; i < contour.length; i++) {
+        ctx.lineTo(contour[i].x, contour[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Cache contours for import
+    this._tracedContours = contours;
+    this._traceScale = scale;
+  },
+
+  _thresholdImage(imageData, threshold, invert) {
+    const { data, width, height } = imageData;
+    const binary = new Uint8Array(width * height);
+    for (let i = 0; i < width * height; i++) {
+      const r = data[i * 4];
+      const g = data[i * 4 + 1];
+      const b = data[i * 4 + 2];
+      const a = data[i * 4 + 3];
+      // Grayscale using luminance weights
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      // Transparent pixels are white
+      const val = a < 128 ? 255 : gray;
+      let isBlack = val < threshold;
+      if (invert) isBlack = !isBlack;
+      binary[i] = isBlack ? 1 : 0;
+    }
+    return binary;
+  },
+
+  _traceContours(binary, w, h) {
+    // Marching squares contour tracing
+    const contours = [];
+    const visited = new Uint8Array(w * h);
+
+    const getPixel = (x, y) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return 0;
+      return binary[y * w + x];
+    };
+
+    // Find boundary pixels (black pixel adjacent to white or edge)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!getPixel(x, y)) continue;
+        if (visited[y * w + x]) continue;
+        // Check if boundary pixel
+        const isBoundary = x === 0 || y === 0 || x === w - 1 || y === h - 1 ||
+          !getPixel(x - 1, y) || !getPixel(x + 1, y) ||
+          !getPixel(x, y - 1) || !getPixel(x, y + 1);
+        if (!isBoundary) continue;
+
+        // Moore neighbor tracing
+        const contour = this._mooreTrace(binary, w, h, x, y, visited);
+        if (contour && contour.length >= 3) {
+          contours.push(contour);
+        }
+      }
+    }
+    return contours;
+  },
+
+  _mooreTrace(binary, w, h, startX, startY, visited) {
+    const getPixel = (x, y) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return 0;
+      return binary[y * w + x];
+    };
+
+    // 8-connectivity neighbors: clockwise from left
+    const dx = [-1, -1, 0, 1, 1, 1, 0, -1];
+    const dy = [0, -1, -1, -1, 0, 1, 1, 1];
+
+    const contour = [{ x: startX, y: startY }];
+    visited[startY * w + startX] = 1;
+
+    let cx = startX, cy = startY;
+    // Start searching from left neighbor
+    let dir = 0; // direction we came from
+
+    // Find first background neighbor to establish starting direction
+    let foundStart = false;
+    for (let i = 0; i < 8; i++) {
+      const nx = cx + dx[i], ny = cy + dy[i];
+      if (!getPixel(nx, ny)) {
+        dir = i;
+        foundStart = true;
+        break;
+      }
+    }
+    if (!foundStart) return null;
+
+    const maxSteps = w * h * 2;
+    let steps = 0;
+
+    while (steps < maxSteps) {
+      steps++;
+      // Search clockwise starting from (dir + 1) % 8
+      let found = false;
+      let searchStart = (dir + 5) % 8; // backtrack: opposite of where we came from + 1
+
+      for (let i = 0; i < 8; i++) {
+        const d = (searchStart + i) % 8;
+        const nx = cx + dx[d], ny = cy + dy[d];
+        if (getPixel(nx, ny)) {
+          cx = nx;
+          cy = ny;
+          dir = (d + 4) % 8; // direction we came from (opposite)
+          found = true;
+
+          if (cx === startX && cy === startY) {
+            return contour;
+          }
+
+          visited[cy * w + cx] = 1;
+          contour.push({ x: cx, y: cy });
+          break;
+        }
+      }
+
+      if (!found) break;
+      if (contour.length > maxSteps) break;
+    }
+
+    return contour.length >= 3 ? contour : null;
+  },
+
+  _contourToPath(contour, canvasW, canvasH) {
+    // Convert pixel contour to font-space path commands
+    // Canvas: Y goes down, origin top-left
+    // Font: Y goes up, baseline at 0, ascender up
+    const { ascender, descender, defaultLsb, defaultRsb } = this.project;
+    const fontH = ascender - descender;
+    const lsb = defaultLsb || 50;
+    const rsb = defaultRsb || 50;
+
+    // Scale contour to fit font metrics
+    // Find bounding box of contour
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of contour) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const cw = maxX - minX || 1;
+    const ch = maxY - minY || 1;
+
+    // Scale to font height
+    const scale = fontH / ch;
+    // Convert: fontX = (px - minX) * scale + lsb
+    //          fontY = ascender - (py - minY) * scale  (flip Y)
+    const cmds = [];
+    for (let i = 0; i < contour.length; i++) {
+      const fx = (contour[i].x - minX) * scale + lsb;
+      const fy = ascender - (contour[i].y - minY) * scale;
+      if (i === 0) cmds.push({ type: 'M', x: fx, y: fy });
+      else cmds.push({ type: 'L', x: fx, y: fy });
+    }
+    cmds.push({ type: 'Z' });
+    return cmds;
+  },
+
+  _simplifyContour(contour, tolerance) {
+    // RDP simplification for contour points
+    if (contour.length < 3) return contour;
+    const pts = contour.map(p => ({ x: p.x, y: p.y }));
+    return this._rdpSimplify(pts, tolerance);
+  },
+
+  _importTracedImage() {
+    if (!this._tracedContours || !this._tracedContours.length) {
+      this._notify('トレースするパスがありません', 'error');
+      return;
+    }
+    if (this.currentUnicode == null) {
+      this._notify('文字を選択してください', 'error');
+      return;
+    }
+
+    const smooth = document.getElementById('trace-smooth')?.checked || false;
+    const { ascender, descender, defaultLsb, defaultRsb } = this.project;
+    const fontH = ascender - descender;
+    const lsb = defaultLsb || 50;
+    const rsb = defaultRsb || 50;
+
+    // Determine bounding box of all contours
+    let allMinX = Infinity, allMinY = Infinity, allMaxX = -Infinity, allMaxY = -Infinity;
+    for (const contour of this._tracedContours) {
+      for (const p of contour) {
+        if (p.x < allMinX) allMinX = p.x;
+        if (p.y < allMinY) allMinY = p.y;
+        if (p.x > allMaxX) allMaxX = p.x;
+        if (p.y > allMaxY) allMaxY = p.y;
+      }
+    }
+    const totalW = allMaxX - allMinX || 1;
+    const totalH = allMaxY - allMinY || 1;
+    const scale = fontH / totalH;
+
+    let allCmds = [];
+    for (const contour of this._tracedContours) {
+      if (contour.length < 3) continue;
+
+      // Simplify the contour first (reduce point count)
+      const simplified = this._simplifyContour(contour, 1.5);
+      if (simplified.length < 3) continue;
+
+      // Convert to font coordinates
+      const cmds = [];
+      for (let i = 0; i < simplified.length; i++) {
+        const fx = (simplified[i].x - allMinX) * scale + lsb;
+        const fy = ascender - (simplified[i].y - allMinY) * scale;
+        if (i === 0) cmds.push({ type: 'M', x: fx, y: fy });
+        else cmds.push({ type: 'L', x: fx, y: fy });
+      }
+      cmds.push({ type: 'Z' });
+      allCmds = allCmds.concat(cmds);
+    }
+
+    if (!allCmds.length) {
+      this._notify('有効なパスが見つかりませんでした', 'error');
+      return;
+    }
+
+    // Optionally smooth with bezier fitting
+    if (smooth) {
+      try {
+        allCmds = fitSmoothBezier(allCmds);
+      } catch (e) {
+        console.warn('Bezier fitting failed, using line segments:', e);
+      }
+    }
+
+    // Calculate advance width
+    const b = getCmdsBounds(allCmds);
+    const aw = Math.round(b.x + b.w + rsb);
+
+    const unicode = this.currentUnicode;
+    const char = String.fromCodePoint(unicode);
+    this.project.glyphs[unicode] = {
+      unicode, char,
+      advanceWidth: aw,
+      lsb, rsb: defaultRsb,
+      pathData: allCmds,
+    };
+
+    this.editor.loadGlyph(this.project.glyphs[unicode]);
+    document.getElementById('advance-width').value = aw;
+    this._refreshGlyphGrid();
+    this._notify(`"${char}" に画像トレース結果をインポートしました`);
+    document.getElementById('image-trace-dialog').style.display = 'none';
   },
 };
 

@@ -68,6 +68,7 @@
   <input type="file" id="batch-file-input" accept=".svg,image/svg+xml" multiple class="hidden-input">
   <input type="file" id="font-file-input" accept=".otf,.ttf,.woff" class="hidden-input">
   <input type="file" id="load-file-input" accept=".fontproj,.json" class="hidden-input">
+  <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp" class="hidden-input">
 
   <!-- ─── Main body ──────────────────────────────────────────────────────── -->
   <div id="main-body">
@@ -644,7 +645,11 @@ abcdefghijklmnopqrstuvwxyz
         </button>
         <button class="modal-choice-btn" id="import-font-file">
           <strong data-i18n="ed_import_font">OTF / TTF / WOFF から取り込み</strong>
-          <span data-i18n="ed_import_font_d">既存のフォントファイルからグリフをインポートします。</span>
+          <span data-i18n="ed_import_font_d">既存のフォ��トファイルからグリフ��インポートします。</span>
+        </button>
+        <button class="modal-choice-btn" id="import-image">
+          <strong>画像から変換 (PNG/JPG)</strong>
+          <span>PNG/JPG画像をSVGパスに変換してインポートします。</span>
         </button>
         <div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px">
           <div style="display:flex;align-items:center;gap:8px">
@@ -661,6 +666,32 @@ abcdefghijklmnopqrstuvwxyz
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Image Trace Dialog ─────────────────────────────────────────────── -->
+  <div id="image-trace-dialog" class="modal-overlay" style="display:none">
+    <div class="modal-box" style="width:480px">
+      <div class="modal-header"><span>画像トレース</span><button class="close-btn" id="image-trace-close">✕</button></div>
+      <div class="modal-body">
+        <div style="text-align:center;margin-bottom:12px">
+          <canvas id="trace-preview-canvas" width="300" height="300" style="border:1px solid #ccc;background:#fff;max-width:100%"></canvas>
+        </div>
+        <div class="slider-row" style="margin-bottom:8px">
+          <label style="font-size:11px;color:#555;min-width:70px">しきい値</label>
+          <input type="range" id="trace-threshold" min="0" max="255" step="1" value="128" style="flex:1;accent-color:#000">
+          <span id="trace-threshold-val" style="font-size:11px;font-family:monospace;min-width:28px;text-align:right">128</span>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:12px;font-size:12px;color:#555">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="trace-invert" style="accent-color:#000"> 反転
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="trace-smooth" checked style="accent-color:#000"> スムーズ
+          </label>
+        </div>
+        <button class="header-btn accent" id="trace-import-btn" style="width:100%;justify-content:center;padding:8px">インポート</button>
       </div>
     </div>
   </div>

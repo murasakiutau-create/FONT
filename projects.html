@@ -168,9 +168,28 @@
     .modal-submit:hover { background: #333; }
 
     /* ─── Responsive ─── */
+    @media (max-width: 768px) {
+      .header { padding: 0 10px; height: 48px; gap: 8px; }
+      .header-title { font-size: 15px; letter-spacing: 1px; }
+      .content { padding: 16px 12px; }
+      .new-project-btn { padding: 14px; font-size: 14px; }
+      .card-top { padding: 12px; gap: 10px; }
+      .card-bottom { padding: 8px 12px; }
+      .auth-area { gap: 4px; }
+      .auth-btn { padding: 4px 10px; font-size: 11px; }
+      .auth-name { max-width: 80px; font-size: 11px; }
+      .auth-avatar { width: 24px; height: 24px; }
+      .modal-box { width: 95vw; max-width: 95vw; }
+    }
     @media (max-width: 500px) {
       .card-name { font-size: 15px; }
       .card-icon { width: 44px; height: 44px; font-size: 20px; }
+      .header { flex-wrap: wrap; height: auto; padding: 8px 10px; }
+      .header-title { font-size: 14px; }
+      .header-count { font-size: 11px; }
+      .card-actions { gap: 4px; }
+      .card-act-btn { width: 32px; height: 32px; }
+      .card-act-btn svg { width: 14px; height: 14px; }
     }
   </style>
 </head>

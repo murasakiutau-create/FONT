@@ -410,6 +410,94 @@ class GlyphEditor {
     this.svg.addEventListener('wheel', e => this._onWheel(e), { passive: false });
     this.svg.addEventListener('dblclick', e => this._onDblclick(e));
     this.svg.addEventListener('contextmenu', e => this._onContextMenu(e));
+
+    // ─── Touch events ───────────────────────────────────────────────────
+    this._lastTouchDist = 0;
+    this._lastTouchMid = null;
+    this._touchStartZoom = 1;
+
+    this.svg.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom start
+        e.preventDefault();
+        const t = e.touches;
+        this._lastTouchDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+        this._lastTouchMid = { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+        this._touchStartZoom = this.zoom;
+        return;
+      }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const mouseEvt = new MouseEvent('mousedown', {
+          clientX: touch.clientX, clientY: touch.clientY,
+          button: 0, bubbles: true, cancelable: true
+        });
+        // Copy target for node/handle detection
+        Object.defineProperty(mouseEvt, 'target', { value: document.elementFromPoint(touch.clientX, touch.clientY) || e.target });
+        this._onMousedown(mouseEvt);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchmove', e => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        e.preventDefault();
+        const t = e.touches;
+        const dist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+        const mid = { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+        if (this._lastTouchDist > 0) {
+          const scale = dist / this._lastTouchDist;
+          const newZoom = Math.min(5, Math.max(0.05, this._touchStartZoom * scale));
+          // Pan so that midpoint stays fixed
+          const rect = this.svg.getBoundingClientRect();
+          const sx = mid.x - rect.left, sy = mid.y - rect.top;
+          const fp = this.screenToFont(sx, sy);
+          this.zoom = newZoom;
+          // Adjust pan to keep fp at screen position (sx, sy)
+          const { ascender } = this.options;
+          this.panX = sx - fp.x * this.zoom;
+          this.panY = sy - (ascender - fp.y) * this.zoom;
+          this._updateTransform();
+          this._renderGrid();
+          this._renderNodes();
+          if (this.options.onZoomChange) this.options.onZoomChange(this.zoom);
+        }
+        return;
+      }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const mouseEvt = new MouseEvent('mousemove', {
+          clientX: touch.clientX, clientY: touch.clientY,
+          button: 0, bubbles: true, cancelable: true
+        });
+        this._onMousemove(mouseEvt);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchend', e => {
+      if (e.touches.length === 0) {
+        this._lastTouchDist = 0;
+        this._lastTouchMid = null;
+        const mouseEvt = new MouseEvent('mouseup', {
+          button: 0, bubbles: true, cancelable: true
+        });
+        this._onMouseup(mouseEvt);
+      }
+      // If going from 2 touches to 1, reset pinch state
+      if (e.touches.length === 1) {
+        this._lastTouchDist = 0;
+        this._lastTouchMid = null;
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchcancel', e => {
+      this._lastTouchDist = 0;
+      this._lastTouchMid = null;
+      this.dragState = null;
+    }, { passive: false });
+
     // Escape to finalize pen path
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && this.editMode === 'pen' && this.penState) {
