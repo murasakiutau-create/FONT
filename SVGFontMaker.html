@@ -4024,11 +4024,13 @@ const App = {
 
     // Back to project list
     document.getElementById('back-to-list')?.addEventListener('click', () => {
-      if (this.project.glyphs && Object.keys(this.project.glyphs).length > 0) {
+      const hasGlyphs = this.project.glyphs && Object.values(this.project.glyphs).some(g => g.pathData && g.pathData.length > 0);
+      if (hasGlyphs) {
         if (!confirm('プロジェクト一覧に戻りますか？\n（未保存のデータは失われます。先にセーブしてください）')) return;
       }
       document.getElementById('app').style.display = 'none';
-      document.getElementById('startup-screen').style.display = 'flex';
+      document.getElementById('startup-screen').style.display = '';
+      StartupScreen.init();
     });
 
     // Save / Load (file-based)
@@ -6053,7 +6055,14 @@ const StartupScreen = {
   startNew() {
     document.getElementById('startup-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    App.init();
+    // Reset project to defaults
+    App.project.glyphs = {};
+    App.project.kerning = {};
+    App.project.name = 'MyFont';
+    App.project.style = 'Regular';
+    App._buildGlyphGrid();
+    App._updateSettingsForm();
+    App.selectChar(65);
   },
 
   loadFile(file) {
@@ -6066,7 +6075,6 @@ const StartupScreen = {
 
         document.getElementById('startup-screen').style.display = 'none';
         document.getElementById('app').style.display = 'flex';
-        App.init();
 
         App.project = { ...App.project, ...data };
         App._buildGlyphGrid();
@@ -6092,23 +6100,20 @@ const StartupScreen = {
 </script>
 
 <script>
-// Upload hint toggle - runs after App.init() via startup screen
+// Start editor directly, startup screen via ← button
 document.addEventListener('DOMContentLoaded', () => {
-  // Delay until App.init() is called by StartupScreen
-  const origInit = App.init.bind(App);
-  App.init = function() {
-    origInit();
-    const hint = document.getElementById('upload-hint');
-    if (hint && App.editor) {
-      const origLoadGlyph = App.editor.loadGlyph.bind(App.editor);
-      App.editor.loadGlyph = function(glyph) {
-        origLoadGlyph(glyph);
-        if (hint) hint.classList.toggle('hidden', !!(glyph && glyph.pathData && glyph.pathData.length > 0));
-      };
-    }
-  };
-  // Show startup screen (don't call App.init yet)
-  StartupScreen.init();
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('startup-screen').style.display = 'none';
+  App.init();
+
+  const hint = document.getElementById('upload-hint');
+  if (hint && App.editor) {
+    const origLoadGlyph = App.editor.loadGlyph.bind(App.editor);
+    App.editor.loadGlyph = function(glyph) {
+      origLoadGlyph(glyph);
+      if (hint) hint.classList.toggle('hidden', !!(glyph && glyph.pathData && glyph.pathData.length > 0));
+    };
+  }
 });
 </script>
 </body>
