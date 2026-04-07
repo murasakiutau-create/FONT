@@ -702,6 +702,14 @@ input[type=file].hidden-input { display: none; }
   </div>
   <div class="startup-content">
     <button class="startup-new-btn" id="startup-new">＋ 新規プロジェクト</button>
+    <button class="startup-new-btn" id="startup-load" style="background:#6b8fa3">ファイルからロード (.fontproj)</button>
+    <input type="file" id="startup-file-input" accept=".fontproj,.json" class="hidden-input" multiple>
+    <div style="margin-top:20px;padding:20px;border:2px dashed #ddd;border-radius:8px;text-align:center;color:#aaa;font-size:13px;line-height:1.8">
+      <strong>使い方</strong><br>
+      「新規プロジェクト」で新しくフォントを作成<br>
+      エディタ内の「セーブ」でPCにファイル保存<br>
+      「ファイルからロード」で続きから編集
+    </div>
     <div id="startup-slots"></div>
   </div>
 </div>
@@ -746,12 +754,6 @@ input[type=file].hidden-input { display: none; }
     <button class="header-btn btn-blue" id="load-slot-btn" title="セーブスロットから読み込み">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       <span>ロード</span>
-    </button>
-    <button class="header-btn" id="save-project" title="ファイルにエクスポート" style="font-size:10px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    </button>
-    <button class="header-btn" id="load-project" title="ファイルから読み込み" style="font-size:10px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
     </button>
 
     <div class="sep"></div>
@@ -1328,19 +1330,6 @@ abcdefghijklmnopqrstuvwxyz
     </div>
   </div>
 
-
-  <!-- ─── Save/Load Slot Dialog ──────────────────────────────────────────── -->
-  <div id="slot-dialog" class="modal-overlay" style="display:none">
-    <div class="modal-box" style="max-width:420px">
-      <div class="modal-header">
-        <span id="slot-dialog-title">セーブ</span>
-        <button class="close-btn" id="slot-dialog-close">✕</button>
-      </div>
-      <div class="modal-body" style="padding:12px">
-        <div id="slot-list" style="display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow-y:auto"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- ─── Import Dialog ──────────────────────────────────────────────────── -->
   <div id="import-dialog" class="modal-overlay" style="display:none">
@@ -4033,9 +4022,18 @@ const App = {
       this._notify('OTFをダウンロードしています...');
     });
 
-    // Save / Load slots
-    document.getElementById('save-slot-btn')?.addEventListener('click', () => this._openSlotDialog('save'));
-    document.getElementById('load-slot-btn')?.addEventListener('click', () => this._openSlotDialog('load'));
+    // Save / Load slots (file-based)
+    document.getElementById('save-slot-btn')?.addEventListener('click', () => this._saveToFile());
+    document.getElementById('load-slot-btn')?.addEventListener('click', () => {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = '.fontproj,.json';
+      inp.multiple = true;
+      inp.addEventListener('change', e => {
+        for (const file of e.target.files) this._loadFromFile(file);
+      });
+      inp.click();
+    });
     document.getElementById('slot-dialog-close')?.addEventListener('click', () => {
       document.getElementById('slot-dialog').style.display = 'none';
     });
@@ -4043,13 +4041,8 @@ const App = {
       if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
     });
 
-    // File export / import
-    document.getElementById('save-project')?.addEventListener('click', () => this._saveProject());
-    document.getElementById('load-project')?.addEventListener('click', () => {
-      const inp = document.getElementById('load-file-input');
-      inp.value = '';
-      inp.click();
-    });
+    // File export / import (legacy, kept for load-file-input)
+
     document.getElementById('load-file-input')?.addEventListener('change', e => {
       const file = e.target.files[0];
       if (file) this._loadProject(file);
@@ -4696,90 +4689,14 @@ const App = {
   },
 
 
-  // ─── Save Slots (30 slots) ──────────────────────────────────────────────────
+  // ─── File-based Save/Load ──────────────────────────────────────────────────
 
-  _openSlotDialog(mode) {
-    this._saveCurrentGlyph();
-    this._slotMode = mode;
-    document.getElementById('slot-dialog-title').textContent = mode === 'save' ? 'セーブ' : 'ロード';
-    this._renderSlotList();
-    document.getElementById('slot-dialog').style.display = 'flex';
-  },
-
-  _renderSlotList() {
-    const container = document.getElementById('slot-list');
-    container.innerHTML = '';
-    const mode = this._slotMode;
-
-    for (let i = 1; i <= 30; i++) {
-      const key = `svgfm_slot_${i}`;
-      let data = null;
-      try {
-        const raw = localStorage.getItem(key);
-        if (raw) data = JSON.parse(raw);
-      } catch {}
-
-      const item = document.createElement('div');
-      item.className = 'slot-item' + (data ? '' : ' empty');
-
-      if (data) {
-        const date = data._savedAt ? new Date(data._savedAt).toLocaleString('ja-JP') : '';
-        const glyphCount = data.glyphs ? Object.keys(data.glyphs).length : 0;
-        item.innerHTML = `
-          <div class="slot-num">${i}</div>
-          <div class="slot-info">
-            <div class="slot-name">${this._esc(data.name || 'NoName')}</div>
-            <div class="slot-meta">${date} — ${glyphCount}グリフ</div>
-          </div>`;
-
-        if (mode === 'save') {
-          // Overwrite confirmation
-          item.addEventListener('click', () => {
-            if (confirm(`スロット${i}「${data.name || 'NoName'}」に上書きしますか？`)) {
-              this._saveToSlot(i);
-            }
-          });
-        } else {
-          item.addEventListener('click', () => this._loadFromSlot(i));
-        }
-
-        // Delete button
-        const del = document.createElement('button');
-        del.className = 'slot-del';
-        del.textContent = '×';
-        del.title = '削除';
-        del.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (confirm(`スロット${i}を削除しますか？`)) {
-            localStorage.removeItem(key);
-            this._renderSlotList();
-          }
-        });
-        item.appendChild(del);
-      } else {
-        item.innerHTML = `
-          <div class="slot-num">${i}</div>
-          <div class="slot-info">
-            <div class="slot-name">— 空き —</div>
-            <div class="slot-meta"></div>
-          </div>`;
-
-        if (mode === 'save') {
-          item.addEventListener('click', () => this._saveToSlot(i));
-        }
-        // Load mode: empty slots are not clickable
-      }
-
-      container.appendChild(item);
-    }
-  },
-
-  _saveToSlot(slotNum) {
+  _saveToFile() {
     this._saveCurrentGlyph();
     const data = JSON.parse(JSON.stringify(this.project));
     data._savedAt = new Date().toISOString();
 
-    // Compress: round coordinates to 1 decimal, remove empty glyphs
+    // Compress coordinates
     if (data.glyphs) {
       for (const [key, g] of Object.entries(data.glyphs)) {
         if (!g.pathData || !g.pathData.length) { delete data.glyphs[key]; continue; }
@@ -4793,47 +4710,37 @@ const App = {
       }
     }
 
-    try {
-      const json = JSON.stringify(data);
-      // Check size before saving
-      const sizeMB = (json.length * 2) / 1024 / 1024;
-      if (sizeMB > 4.5) {
-        this._notify(`データが大きすぎます (${sizeMB.toFixed(1)}MB)。グリフ数を減らしてください`, 'error');
-        return;
-      }
-      localStorage.setItem(`svgfm_slot_${slotNum}`, json);
-      this._notify(`スロット${slotNum}にセーブしました (${(sizeMB).toFixed(2)}MB)`);
-      document.getElementById('slot-dialog').style.display = 'none';
-    } catch (e) {
-      // Try clearing other auto-save data to free space
-      try {
-        localStorage.removeItem('svgfontmaker_standalone');
-        localStorage.setItem(`svgfm_slot_${slotNum}`, JSON.stringify(data));
-        this._notify(`スロット${slotNum}にセーブしました（キャッシュをクリアしました）`);
-        document.getElementById('slot-dialog').style.display = 'none';
-      } catch (e2) {
-        this._notify('容量不足です。不要なスロットを削除してください', 'error');
-      }
-    }
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const name = (this.project.name || 'MyFont').replace(/[^a-zA-Z0-9_\-\u3000-\u9FFF]/g, '_');
+    a.href = url;
+    a.download = `${name}.fontproj`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this._notify(`「${this.project.name}」をファイルに保存しました`);
   },
 
-  _loadFromSlot(slotNum) {
-    try {
-      const raw = localStorage.getItem(`svgfm_slot_${slotNum}`);
-      if (!raw) { this._notify('スロットが空です', 'error'); return; }
-      const data = JSON.parse(raw);
-      delete data._savedAt;
-      this.project = data;
-      this._buildGlyphGrid();
-      this._updateSettingsForm();
-      const firstUni = parseInt(Object.keys(data.glyphs || {})[0]) || 65;
-      this.currentUnicode = null;
-      this.selectChar(firstUni);
-      this._notify(`スロット${slotNum}からロードしました`);
-      document.getElementById('slot-dialog').style.display = 'none';
-    } catch (e) {
-      this._notify('ロードに失敗しました', 'error');
-    }
+  _loadFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.glyphs) throw new Error('無効なプロジェクトファイルです');
+        delete data._savedAt;
+        this.project = data;
+        this._buildGlyphGrid();
+        this._updateSettingsForm();
+        const firstUni = parseInt(Object.keys(data.glyphs)[0]) || 65;
+        this.currentUnicode = null;
+        this.selectChar(firstUni);
+        this._notify(`「${data.name || 'NoName'}」をロードしました`);
+      } catch (err) {
+        this._notify('ロードエラー: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
   },
 
   _esc(s) {
@@ -6127,60 +6034,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const StartupScreen = {
   init() {
-    this.renderSlots();
     document.getElementById('startup-new')?.addEventListener('click', () => this.startNew());
-  },
-
-  renderSlots() {
-    const container = document.getElementById('startup-slots');
-    if (!container) return;
-    container.innerHTML = '';
-
-    let hasAny = false;
-    for (let i = 1; i <= 30; i++) {
-      const key = `svgfm_slot_${i}`;
-      let data = null;
-      try {
-        const raw = localStorage.getItem(key);
-        if (raw) data = JSON.parse(raw);
-      } catch {}
-
-      if (!data) continue;
-      hasAny = true;
-
-      const date = data._savedAt ? new Date(data._savedAt).toLocaleString('ja-JP') : '';
-      const glyphCount = data.glyphs ? Object.keys(data.glyphs).length : 0;
-      const sizeMB = ((raw.length * 2) / 1024 / 1024).toFixed(2);
-
-      const item = document.createElement('div');
-      item.className = 'slot-item';
-      item.innerHTML = `
-        <div class="slot-num">${i}</div>
-        <div class="slot-info">
-          <div class="slot-name">${this.esc(data.name || 'NoName')}</div>
-          <div class="slot-meta">${date} — ${glyphCount}グリフ — ${sizeMB}MB${data.style && data.style !== 'Regular' ? ' — ' + data.style : ''}</div>
-        </div>`;
-
-      const del = document.createElement('button');
-      del.className = 'slot-del';
-      del.textContent = '×';
-      del.title = '削除';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`スロット${i}「${data.name || 'NoName'}」を削除しますか？`)) {
-          localStorage.removeItem(key);
-          this.renderSlots();
-        }
-      });
-
-      item.addEventListener('click', () => this.loadSlot(i));
-      item.appendChild(del);
-      container.appendChild(item);
-    }
-
-    if (!hasAny) {
-      container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#aaa;font-size:14px">保存されたプロジェクトはありません<br>「＋ 新規プロジェクト」で始めましょう</div>';
-    }
+    document.getElementById('startup-load')?.addEventListener('click', () => {
+      document.getElementById('startup-file-input').click();
+    });
+    document.getElementById('startup-file-input')?.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) this.loadFile(file);
+    });
   },
 
   startNew() {
@@ -6189,29 +6050,30 @@ const StartupScreen = {
     App.init();
   },
 
-  loadSlot(slotNum) {
-    try {
-      const raw = localStorage.getItem(`svgfm_slot_${slotNum}`);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      delete data._savedAt;
+  loadFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.glyphs) throw new Error('無効なファイルです');
+        delete data._savedAt;
 
-      document.getElementById('startup-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'flex';
-      App.init();
+        document.getElementById('startup-screen').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        App.init();
 
-      // Load the slot data after init
-      App.project = { ...App.project, ...data };
-      App._buildGlyphGrid();
-      App._updateSettingsForm();
-      const firstUni = parseInt(Object.keys(data.glyphs || {})[0]) || 65;
-      App.currentUnicode = null;
-      App.selectChar(firstUni);
-      App._notify(`スロット${slotNum}をロードしました`);
-    } catch (e) {
-      console.error(e);
-      alert('ロードに失敗しました');
-    }
+        App.project = { ...App.project, ...data };
+        App._buildGlyphGrid();
+        App._updateSettingsForm();
+        const firstUni = parseInt(Object.keys(data.glyphs)[0]) || 65;
+        App.currentUnicode = null;
+        App.selectChar(firstUni);
+        App._notify(`「${data.name || 'NoName'}」をロードしました`);
+      } catch (err) {
+        alert('ロードエラー: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
   },
 
   esc(s) {
