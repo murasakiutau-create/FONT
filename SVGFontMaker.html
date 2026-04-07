@@ -1396,8 +1396,22 @@ abcdefghijklmnopqrstuvwxyz
 
 </div><!-- #app -->
 
-<!-- opentype.js from CDN -->
+<!-- opentype.js from CDN (with fallback message) -->
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+<script>
+if (typeof opentype === 'undefined') {
+  // Try alternative CDN
+  var s = document.createElement('script');
+  s.src = 'https://unpkg.com/opentype.js@1.3.4/dist/opentype.min.js';
+  s.onerror = function() {
+    var banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c07070;color:#fff;padding:10px;text-align:center;z-index:99999;font-size:13px';
+    banner.innerHTML = '<strong>opentype.js の読み込みに失敗しました。</strong><br>フォントのエクスポートにはインターネット接続が必要です。<br>一度オンラインで開くとキャッシュされ、次回からオフラインでも使えます。';
+    document.body.appendChild(banner);
+  };
+  document.head.appendChild(s);
+}
+</script>
 
 <script>
 /**
@@ -3232,8 +3246,7 @@ function generateAndDownloadFont(project, format = 'ttf') {
 
     const lsb = glyph.lsb != null ? glyph.lsb : (project.defaultLsb || 50);
     const rsb = glyph.rsb != null ? glyph.rsb : (project.defaultRsb || 50);
-    const bounds = getCmdsBounds(cmds);
-    const glyphWidth = glyph.advanceWidth || (bounds.w > 0 ? bounds.x + bounds.w + rsb : 600);
+    const bounds = getCmdsBounds(fixedCmds);    const glyphWidth = glyph.advanceWidth || (bounds.w > 0 ? bounds.x + bounds.w + rsb : 600);
 
     const otGlyph = new opentype.Glyph({
       name: `uni${unicode.toString(16).toUpperCase().padStart(4, '0')}`,
