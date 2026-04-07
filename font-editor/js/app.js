@@ -10,6 +10,7 @@ const CHAR_GROUPS = [
   { label: 'lowercase', chars: 'abcdefghijklmnopqrstuvwxyz' },
   { label: '0 – 9', chars: '0123456789' },
   { label: 'Symbols', chars: '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~' },
+  { label: '全角記号', chars: '！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝' },
   { label: 'Space', chars: ' ' },
   { label: 'ひらがな', chars: 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん' },
   { label: 'ひらがな濁音', chars: 'がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ' },
