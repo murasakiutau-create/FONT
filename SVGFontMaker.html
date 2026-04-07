@@ -395,6 +395,30 @@ input[type=file].hidden-input { display: none; }
 .modal-choice-btn strong { font-size: 13px; color: #000; }
 .modal-choice-btn span { font-size: 11px; color: #666; line-height: 1.4; }
 
+/* ─── Startup Screen ───────────────────────────────────────────────────── */
+#startup-screen {
+  height: 100vh; display: flex; flex-direction: column;
+  background: #fff; font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.startup-header {
+  border-bottom: 3px solid #000; padding: 24px; text-align: center;
+}
+.startup-header h1 {
+  font-size: 28px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase;
+}
+.startup-header p { font-size: 13px; color: #888; margin-top: 4px; }
+.startup-content {
+  flex: 1; overflow-y: auto; max-width: 600px; width: 100%;
+  margin: 0 auto; padding: 20px 16px;
+}
+.startup-new-btn {
+  width: 100%; padding: 14px; margin-bottom: 16px;
+  background: #000; color: #fff; border: none; border-radius: 8px;
+  font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 1px;
+}
+.startup-new-btn:hover { background: #333; }
+#startup-slots { display: flex; flex-direction: column; gap: 8px; }
+
 /* ─── Save Slots ───────────────────────────────────────────────────────── */
 .slot-item {
   display: flex; align-items: center; gap: 10px;
@@ -670,10 +694,23 @@ input[type=file].hidden-input { display: none; }
   </style>
 </head>
 <body>
-<div id="app">
+<!-- ─── Project List (Startup Screen) ─────────────────────────────────── -->
+<div id="startup-screen">
+  <div class="startup-header">
+    <h1>SVG Font Maker</h1>
+    <p>プロジェクトを選択してください</p>
+  </div>
+  <div class="startup-content">
+    <button class="startup-new-btn" id="startup-new">＋ 新規プロジェクト</button>
+    <div id="startup-slots"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
 
   <!-- Header -->
   <header id="header">
+    <button class="header-btn" id="back-to-list" title="プロジェクト一覧に戻る" style="font-size:16px;padding:4px 8px" onclick="location.reload()">←</button>
     <div class="logo">SVG Font Maker</div>
     <div class="sep"></div>
     <span id="font-name-display">MyFont</span>
@@ -6045,8 +6082,105 @@ const App = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  App.init();
+  // Show startup screen first
+  StartupScreen.init();
 });
+
+const StartupScreen = {
+  init() {
+    this.renderSlots();
+    document.getElementById('startup-new')?.addEventListener('click', () => this.startNew());
+  },
+
+  renderSlots() {
+    const container = document.getElementById('startup-slots');
+    if (!container) return;
+    container.innerHTML = '';
+
+    let hasAny = false;
+    for (let i = 1; i <= 30; i++) {
+      const key = `svgfm_slot_${i}`;
+      let data = null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) data = JSON.parse(raw);
+      } catch {}
+
+      if (!data) continue;
+      hasAny = true;
+
+      const date = data._savedAt ? new Date(data._savedAt).toLocaleString('ja-JP') : '';
+      const glyphCount = data.glyphs ? Object.keys(data.glyphs).length : 0;
+      const initial = (data.name || 'F').charAt(0).toUpperCase();
+
+      const item = document.createElement('div');
+      item.className = 'slot-item';
+      item.innerHTML = `
+        <div class="slot-num">${i}</div>
+        <div class="slot-info">
+          <div class="slot-name">${this.esc(data.name || 'NoName')}</div>
+          <div class="slot-meta">${date} — ${glyphCount}グリフ${data.style && data.style !== 'Regular' ? ' — ' + data.style : ''}</div>
+        </div>`;
+
+      const del = document.createElement('button');
+      del.className = 'slot-del';
+      del.textContent = '×';
+      del.title = '削除';
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`スロット${i}「${data.name || 'NoName'}」を削除しますか？`)) {
+          localStorage.removeItem(key);
+          this.renderSlots();
+        }
+      });
+
+      item.addEventListener('click', () => this.loadSlot(i));
+      item.appendChild(del);
+      container.appendChild(item);
+    }
+
+    if (!hasAny) {
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#aaa;font-size:14px">保存されたプロジェクトはありません<br>「＋ 新規プロジェクト」で始めましょう</div>';
+    }
+  },
+
+  startNew() {
+    document.getElementById('startup-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    App.init();
+  },
+
+  loadSlot(slotNum) {
+    try {
+      const raw = localStorage.getItem(`svgfm_slot_${slotNum}`);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      delete data._savedAt;
+
+      document.getElementById('startup-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      App.init();
+
+      // Load the slot data after init
+      App.project = { ...App.project, ...data };
+      App._buildGlyphGrid();
+      App._updateSettingsForm();
+      const firstUni = parseInt(Object.keys(data.glyphs || {})[0]) || 65;
+      App.currentUnicode = null;
+      App.selectChar(firstUni);
+      App._notify(`スロット${slotNum}をロードしました`);
+    } catch (e) {
+      console.error(e);
+      alert('ロードに失敗しました');
+    }
+  },
+
+  esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  },
+};
 
 </script>
 
