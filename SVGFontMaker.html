@@ -718,7 +718,7 @@ input[type=file].hidden-input { display: none; }
 
   <!-- Header -->
   <header id="header">
-    <button class="header-btn" id="back-to-list" title="プロジェクト一覧に戻る" style="font-size:16px;padding:4px 8px" onclick="location.reload()">←</button>
+    <button class="header-btn" id="back-to-list" title="プロジェクト一覧に戻る" style="font-size:16px;padding:4px 8px">←</button>
     <div class="logo">SVG Font Maker</div>
     <div class="sep"></div>
     <span id="font-name-display">MyFont</span>
@@ -4022,7 +4022,16 @@ const App = {
       this._notify('OTFをダウンロードしています...');
     });
 
-    // Save / Load slots (file-based)
+    // Back to project list
+    document.getElementById('back-to-list')?.addEventListener('click', () => {
+      if (this.project.glyphs && Object.keys(this.project.glyphs).length > 0) {
+        if (!confirm('プロジェクト一覧に戻りますか？\n（未保存のデータは失われます。先にセーブしてください）')) return;
+      }
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('startup-screen').style.display = 'flex';
+    });
+
+    // Save / Load (file-based)
     document.getElementById('save-slot-btn')?.addEventListener('click', () => this._saveToFile());
     document.getElementById('load-slot-btn')?.addEventListener('click', () => {
       const inp = document.createElement('input');
