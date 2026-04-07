@@ -89,6 +89,15 @@ function generateAndDownloadFont(project, format = 'ttf') {
 
   const glyphs = [notdefGlyph];
 
+  // Build halfwidth↔fullwidth mapping (ASCII U+0021-007E ↔ Fullwidth U+FF01-FF5E)
+  const hwToFw = {};
+  const fwToHw = {};
+  for (let i = 0x0021; i <= 0x007E; i++) {
+    const fw = i - 0x0021 + 0xFF01;
+    hwToFw[i] = fw;
+    fwToHw[fw] = i;
+  }
+
   for (const [unicodeStr, glyph] of Object.entries(project.glyphs)) {
     const unicode = parseInt(unicodeStr);
     if (!glyph.pathData || glyph.pathData.length === 0) continue;
