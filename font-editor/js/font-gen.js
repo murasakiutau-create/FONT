@@ -11,49 +11,87 @@
  */
 function fixWindingForExport(cmds) {
   const subs = splitSubpaths(cmds);
-  if (subs.length <= 1) return cmds;
+  if (subs.length <= 1) {
+    // Single path: ensure it's CCW (positive area) for outer
+    const area = windingArea(cmds);
+    if (area < 0) return reverseSubpath(cmds);
+    return cmds;
+  }
 
-  // Calculate bbox and winding area for each subpath
-  const subData = subs.map(sub => {
-    const b = getCmdsBounds(sub.cmds);
-    const area = windingArea(sub.cmds);
-    return { sub, bounds: b, area };
-  });
+  // Multiple subpaths: determine outer vs hole
+  const subData = subs.map(sub => ({
+    cmds: sub.cmds, closed: sub.closed,
+    bounds: getCmdsBounds(sub.cmds),
+    area: windingArea(sub.cmds),
+  }));
 
-  // Sort by area (largest first = outer paths first)
+  // Sort by absolute area (largest = outer)
   subData.sort((a, b) => Math.abs(b.area) - Math.abs(a.area));
 
-  // Determine if each subpath is inside another (= hole)
   const result = [];
   for (let i = 0; i < subData.length; i++) {
     const sd = subData[i];
-    const bi = sd.bounds;
-    let isHole = false;
+    const cx = sd.bounds.x + sd.bounds.w / 2;
+    const cy = sd.bounds.y + sd.bounds.h / 2;
 
-    // Check if this subpath's bbox center is inside any larger subpath
-    const cx = bi.x + bi.w / 2, cy = bi.y + bi.h / 2;
+    // Count how many larger subpaths contain this one
+    let containCount = 0;
     for (let j = 0; j < i; j++) {
       const bj = subData[j].bounds;
       if (cx > bj.x && cx < bj.x + bj.w && cy > bj.y && cy < bj.y + bj.h) {
-        isHole = true;
-        break;
+        containCount++;
       }
     }
+    // Even nesting = outer, odd nesting = hole
+    const isHole = containCount % 2 === 1;
 
-    // OTF/CFF (Y-up coords):
-    //   outer = counter-clockwise = POSITIVE windingArea
-    //   hole  = clockwise         = NEGATIVE windingArea
-    let subCmds = sd.sub.cmds;
+    let subCmds = sd.cmds;
     if (isHole) {
-      // Hole should have negative area (CW)
-      if (sd.area > 0) subCmds = reverseCmds(subCmds);
+      // Hole: need negative area (CW)
+      if (sd.area > 0) subCmds = reverseSubpath(subCmds);
     } else {
-      // Outer should have positive area (CCW)
-      if (sd.area < 0) subCmds = reverseCmds(subCmds);
+      // Outer: need positive area (CCW)
+      if (sd.area < 0) subCmds = reverseSubpath(subCmds);
     }
     result.push(...subCmds);
   }
+  return result;
+}
 
+// Reverse a subpath's winding WITHOUT changing its visual shape
+function reverseSubpath(cmds) {
+  const subs = splitSubpaths(cmds);
+  const result = [];
+  for (const sub of subs) {
+    const pts = []; // {x, y, cp1x, cp1y, cp2x, cp2y, type}
+    let px = 0, py = 0;
+    for (const c of sub.cmds) {
+      if (c.type === 'M') { px = c.x; py = c.y; pts.push({ x: c.x, y: c.y, type: 'M' }); }
+      else if (c.type === 'L') { pts.push({ x: c.x, y: c.y, type: 'L', fromX: px, fromY: py }); px = c.x; py = c.y; }
+      else if (c.type === 'C') {
+        pts.push({ x: c.x, y: c.y, cp1x: c.cp1x, cp1y: c.cp1y, cp2x: c.cp2x, cp2y: c.cp2y, type: 'C', fromX: px, fromY: py });
+        px = c.x; py = c.y;
+      }
+      else if (c.type === 'Z') { /* handled below */ }
+    }
+    if (pts.length === 0) continue;
+
+    // Build reversed path
+    const last = pts[pts.length - 1];
+    result.push({ type: 'M', x: last.x, y: last.y });
+
+    for (let i = pts.length - 1; i >= 1; i--) {
+      const cur = pts[i];
+      const prev = pts[i - 1];
+      if (cur.type === 'L') {
+        result.push({ type: 'L', x: prev.x, y: prev.y });
+      } else if (cur.type === 'C') {
+        // Swap control points
+        result.push({ type: 'C', cp1x: cur.cp2x, cp1y: cur.cp2y, cp2x: cur.cp1x, cp2y: cur.cp1y, x: prev.x, y: prev.y });
+      }
+    }
+    if (sub.closed) result.push({ type: 'Z' });
+  }
   return result;
 }
 
@@ -88,6 +126,15 @@ function generateAndDownloadFont(project, format = 'ttf') {
   });
 
   const glyphs = [notdefGlyph];
+
+  // Build halfwidth↔fullwidth mapping (ASCII U+0021-007E ↔ Fullwidth U+FF01-FF5E)
+  const hwToFw = {};
+  const fwToHw = {};
+  for (let i = 0x0021; i <= 0x007E; i++) {
+    const fw = i - 0x0021 + 0xFF01;
+    hwToFw[i] = fw;
+    fwToHw[fw] = i;
+  }
 
   for (const [unicodeStr, glyph] of Object.entries(project.glyphs)) {
     const unicode = parseInt(unicodeStr);
