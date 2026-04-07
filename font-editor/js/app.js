@@ -1373,28 +1373,32 @@ const App = {
     this._saveCurrentGlyph();
     this._autoSave(); // localStorage
 
-    // Cloud save
+    // Cloud save with retry
     if (this.projectId && typeof FirebaseApp !== 'undefined') {
       const user = FirebaseApp.getCurrentUser();
       if (user) {
-        try {
-          const el = document.getElementById('save-status');
-          if (el) el.textContent = '☁ 保存中...';
-          const saveData = {
-            ...this.project,
-            created: this._projectCreated || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
-          const now = new Date();
-          const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-          if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
-          this._notify('クラウドに保存しました');
-          return;
-        } catch (e) {
-          console.warn('Cloud save failed:', e);
-          this._notify('クラウド保存に失敗。ファイルとして保存します', 'error');
+        const el = document.getElementById('save-status');
+        const saveData = {
+          ...this.project,
+          created: this._projectCreated || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            if (el) el.textContent = attempt > 1 ? `☁ リトライ中(${attempt}/3)...` : '☁ 保存中...';
+            await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
+            const now = new Date();
+            const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+            if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
+            this._notify('クラウドに保存しました');
+            return;
+          } catch (e) {
+            console.warn(`Cloud save attempt ${attempt} failed:`, e);
+            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 2000));
+          }
         }
+        this._notify('ネットワークエラー。ファイルとして保存します', 'error');
+        if (el) el.textContent = '✓ ローカル保存済（☁ オフライン）';
       }
     }
 
@@ -1426,23 +1430,38 @@ const App = {
     const user = FirebaseApp.getCurrentUser();
     if (!user) return;
     this._saveCurrentGlyph();
-    try {
-      const el = document.getElementById('save-status');
-      if (el) el.textContent = '☁ 同期中...';
-      // Build save data: project metadata + full data
-      const saveData = {
-        ...this.project,
-        created: this._projectCreated || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
-      const now = new Date();
-      const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-      if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
-    } catch (e) {
-      console.warn('Cloud auto-save failed:', e);
-      const el = document.getElementById('save-status');
-      if (el) el.textContent = '☁ 同期エラー';
+
+    const el = document.getElementById('save-status');
+    const saveData = {
+      ...this.project,
+      created: this._projectCreated || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Retry up to 3 times with increasing delay
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        if (el) el.textContent = attempt > 1 ? `☁ リトライ中(${attempt}/3)...` : '☁ 同期中...';
+        await FirebaseApp.saveProject(user.uid, this.projectId, saveData);
+        const now = new Date();
+        const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        if (el) el.textContent = `☁ クラウド保存済 ${ts}`;
+        this._cloudRetryFails = 0;
+        return; // success
+      } catch (e) {
+        console.warn(`Cloud save attempt ${attempt} failed:`, e);
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, attempt * 2000)); // 2s, 4s wait
+        }
+      }
+    }
+    // All retries failed
+    this._cloudRetryFails = (this._cloudRetryFails || 0) + 1;
+    if (el) el.textContent = '✓ ローカル保存済（☁ オフライン）';
+    // Only notify occasionally, not every 30 seconds
+    if (this._cloudRetryFails <= 1) {
+      this._notify('ネットワーク不安定のためローカルに保存中。復帰時に自動同期します。', 'error');
+    }
     }
   },
 
