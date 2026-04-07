@@ -6036,10 +6036,7 @@ const App = {
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Show startup screen first
-  StartupScreen.init();
-});
+// StartupScreen.init() is called from the bottom script block
 
 const StartupScreen = {
   init() {
@@ -6095,15 +6092,23 @@ const StartupScreen = {
 </script>
 
 <script>
+// Upload hint toggle - runs after App.init() via startup screen
 document.addEventListener('DOMContentLoaded', () => {
-  const hint = document.getElementById('upload-hint');
-  if (hint && App.editor) {
-    const origLoadGlyph = App.editor.loadGlyph.bind(App.editor);
-    App.editor.loadGlyph = function(glyph) {
-      origLoadGlyph(glyph);
-      if (hint) hint.classList.toggle('hidden', !!(glyph && glyph.pathData && glyph.pathData.length > 0));
-    };
-  }
+  // Delay until App.init() is called by StartupScreen
+  const origInit = App.init.bind(App);
+  App.init = function() {
+    origInit();
+    const hint = document.getElementById('upload-hint');
+    if (hint && App.editor) {
+      const origLoadGlyph = App.editor.loadGlyph.bind(App.editor);
+      App.editor.loadGlyph = function(glyph) {
+        origLoadGlyph(glyph);
+        if (hint) hint.classList.toggle('hidden', !!(glyph && glyph.pathData && glyph.pathData.length > 0));
+      };
+    }
+  };
+  // Show startup screen (don't call App.init yet)
+  StartupScreen.init();
 });
 </script>
 </body>
