@@ -718,7 +718,9 @@ input[type=file].hidden-input { display: none; }
 
   <!-- Header -->
   <header id="header">
-    <button class="header-btn" id="back-to-list" title="プロジェクト一覧に戻る" style="font-size:16px;padding:4px 8px">←</button>
+    <button class="header-btn btn-red" id="go-home-btn" title="プロジェクト一覧" onclick="if(confirm('プロジェクト一覧に戻りますか？\n（未保存のデータは失われます）')){document.getElementById('app').style.display='none';document.getElementById('startup-screen').style.display='';StartupScreen.init();}">
+      ホーム
+    </button>
     <div class="logo">SVG Font Maker</div>
     <div class="sep"></div>
     <span id="font-name-display">MyFont</span>
