@@ -4778,12 +4778,42 @@ const App = {
     this._saveCurrentGlyph();
     const data = JSON.parse(JSON.stringify(this.project));
     data._savedAt = new Date().toISOString();
+
+    // Compress: round coordinates to 1 decimal, remove empty glyphs
+    if (data.glyphs) {
+      for (const [key, g] of Object.entries(data.glyphs)) {
+        if (!g.pathData || !g.pathData.length) { delete data.glyphs[key]; continue; }
+        g.pathData = g.pathData.map(c => {
+          const r = v => Math.round(v * 10) / 10;
+          if (c.type === 'M' || c.type === 'L') return { type: c.type, x: r(c.x), y: r(c.y) };
+          if (c.type === 'C') return { type: 'C', cp1x: r(c.cp1x), cp1y: r(c.cp1y), cp2x: r(c.cp2x), cp2y: r(c.cp2y), x: r(c.x), y: r(c.y) };
+          return c;
+        });
+        g.advanceWidth = Math.round(g.advanceWidth);
+      }
+    }
+
     try {
-      localStorage.setItem(`svgfm_slot_${slotNum}`, JSON.stringify(data));
-      this._notify(`スロット${slotNum}にセーブしました`);
+      const json = JSON.stringify(data);
+      // Check size before saving
+      const sizeMB = (json.length * 2) / 1024 / 1024;
+      if (sizeMB > 4.5) {
+        this._notify(`データが大きすぎます (${sizeMB.toFixed(1)}MB)。グリフ数を減らしてください`, 'error');
+        return;
+      }
+      localStorage.setItem(`svgfm_slot_${slotNum}`, json);
+      this._notify(`スロット${slotNum}にセーブしました (${(sizeMB).toFixed(2)}MB)`);
       document.getElementById('slot-dialog').style.display = 'none';
     } catch (e) {
-      this._notify('保存に失敗しました（容量不足の可能性があります）', 'error');
+      // Try clearing other auto-save data to free space
+      try {
+        localStorage.removeItem('svgfontmaker_standalone');
+        localStorage.setItem(`svgfm_slot_${slotNum}`, JSON.stringify(data));
+        this._notify(`スロット${slotNum}にセーブしました（キャッシュをクリアしました）`);
+        document.getElementById('slot-dialog').style.display = 'none';
+      } catch (e2) {
+        this._notify('容量不足です。不要なスロットを削除してください', 'error');
+      }
     }
   },
 
@@ -4815,7 +4845,16 @@ const App = {
   _autoSave() {
     this._saveCurrentGlyph();
     try {
-      localStorage.setItem('svgfontmaker_standalone', JSON.stringify(this.project));
+      // Only save glyphs with data (skip empty) to reduce size
+      const lite = { ...this.project };
+      if (lite.glyphs) {
+        const cleaned = {};
+        for (const [k, g] of Object.entries(lite.glyphs)) {
+          if (g.pathData && g.pathData.length) cleaned[k] = g;
+        }
+        lite.glyphs = cleaned;
+      }
+      localStorage.setItem('svgfontmaker_standalone', JSON.stringify(lite));
       const now = new Date();
       const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
       const el = document.getElementById('save-status');
@@ -6111,7 +6150,7 @@ const StartupScreen = {
 
       const date = data._savedAt ? new Date(data._savedAt).toLocaleString('ja-JP') : '';
       const glyphCount = data.glyphs ? Object.keys(data.glyphs).length : 0;
-      const initial = (data.name || 'F').charAt(0).toUpperCase();
+      const sizeMB = ((raw.length * 2) / 1024 / 1024).toFixed(2);
 
       const item = document.createElement('div');
       item.className = 'slot-item';
@@ -6119,7 +6158,7 @@ const StartupScreen = {
         <div class="slot-num">${i}</div>
         <div class="slot-info">
           <div class="slot-name">${this.esc(data.name || 'NoName')}</div>
-          <div class="slot-meta">${date} — ${glyphCount}グリフ${data.style && data.style !== 'Regular' ? ' — ' + data.style : ''}</div>
+          <div class="slot-meta">${date} — ${glyphCount}グリフ — ${sizeMB}MB${data.style && data.style !== 'Regular' ? ' — ' + data.style : ''}</div>
         </div>`;
 
       const del = document.createElement('button');
