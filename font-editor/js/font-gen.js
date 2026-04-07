@@ -156,7 +156,7 @@ function generateAndDownloadFont(project, format = 'ttf') {
 
     const lsb = glyph.lsb != null ? glyph.lsb : (project.defaultLsb || 50);
     const rsb = glyph.rsb != null ? glyph.rsb : (project.defaultRsb || 50);
-    const bounds = getCmdsBounds(cmds);
+    const bounds = getCmdsBounds(fixedCmds);
     const glyphWidth = glyph.advanceWidth || (bounds.w > 0 ? bounds.x + bounds.w + rsb : 600);
 
     const otGlyph = new opentype.Glyph({
