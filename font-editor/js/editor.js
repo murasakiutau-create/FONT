@@ -21,14 +21,20 @@ class GlyphEditor {
     this.zoom = 0.5;
     this.panX = 60;
     this.panY = 40;
-    this.editMode = 'select'; // 'select' | 'node' | 'move'
+    this.editMode = 'select'; // 'select' | 'node' | 'pen' | 'move'
     this.selectedPath = -1;   // index into glyph.pathData
     this.selectedNode = -1;   // index within subpath
     this.selectedHandle = null; // {nodeIdx, side: 'cp1'|'cp2'}
     this.showReference = true;
-    this.referenceFont = 'serif';
+    this.referenceFont = 'sans-serif';
     this.showHandles = true;
     this.dragState = null;
+    this.customGuides = [];   // array of Y values for custom guidelines
+    this.customGuidesX = [];  // array of X values for custom vertical guidelines
+    this.refSizeOverride = null;
+    this.refNudgeOverride = null;
+    // Pen tool state
+    this.penState = null;     // { cmds: [], firstPoint: {x,y}, dragging: false, dragStart: {x,y} }
 
     this._buildLayers();
     this._bindEvents();
@@ -51,7 +57,7 @@ class GlyphEditor {
     this.svg.appendChild(this.mainGroup);
 
     // Reference layer (inside main group = font coords)
-    this.refLayer = this._el('g', { id: 'ref-layer', opacity: '0.13' });
+    this.refLayer = this._el('g', { id: 'ref-layer', opacity: '0.35' });
     this.mainGroup.appendChild(this.refLayer);
 
     // Glyph paths layer
@@ -59,12 +65,16 @@ class GlyphEditor {
     this.mainGroup.appendChild(this.pathsLayer);
 
     // Advance width line (in main group)
-    this.awLine = this._el('line', { id: 'aw-line', 'stroke': '#e94560', 'stroke-width': '1', 'stroke-dasharray': '4,4', opacity: '0.5' });
+    this.awLine = this._el('line', { id: 'aw-line', 'stroke': '#000', 'stroke-width': '1', 'stroke-dasharray': '4,4', opacity: '0.4' });
     this.mainGroup.appendChild(this.awLine);
 
     // Nodes layer (inside main group, compensated sizes)
     this.nodesLayer = this._el('g', { id: 'nodes-layer' });
     this.mainGroup.appendChild(this.nodesLayer);
+
+    // Resize handles layer (inside main group)
+    this.resizeLayer = this._el('g', { id: 'resize-layer' });
+    this.mainGroup.appendChild(this.resizeLayer);
 
     // Overlay (screen space — for grid guide labels)
     this.overlayLayer = this._el('g', { id: 'overlay-layer' });
@@ -102,6 +112,9 @@ class GlyphEditor {
     this.selectedPath = -1;
     this.selectedNode = -1;
     this.selectedHandle = null;
+    this.penState = null;
+    const penPreview = this.mainGroup?.querySelector('#pen-preview');
+    if (penPreview) penPreview.remove();
     this.fitToView();
     this.render();
     this._notifyBBox();
@@ -159,6 +172,30 @@ class GlyphEditor {
     this._renderPaths();
     this._renderNodes();
     this._renderAdvanceWidth();
+    this._renderResizeHandles();
+    this._renderNodeCount();
+  }
+
+  _renderNodeCount() {
+    let el = this.overlayLayer.querySelector('#node-count-label');
+    if (!el) {
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      el.id = 'node-count-label';
+      el.setAttribute('class', 'guide-label');
+      el.setAttribute('text-anchor', 'end');
+      el.setAttribute('font-size', '11');
+      el.setAttribute('fill', '#999');
+      this.overlayLayer.appendChild(el);
+    }
+    const rect = this.svg.getBoundingClientRect();
+    el.setAttribute('x', (rect.width || 800) - 8);
+    el.setAttribute('y', 16);
+    if (!this.glyph || !this.glyph.pathData) {
+      el.textContent = '';
+      return;
+    }
+    const count = this.glyph.pathData.filter(c => c.type === 'M' || c.type === 'L' || c.type === 'C').length;
+    el.textContent = `Nodes: ${count}`;
   }
 
   _renderGrid() {
@@ -191,29 +228,78 @@ class GlyphEditor {
     const sx0 = this.fontToScreen(0, 0).x;
     const lsb = this._el('line', { x1: sx0, y1: 0, x2: sx0, y2: H, class: 'guide-line guide-lsb' });
     this.gridLayer.appendChild(lsb);
+
+    // Custom horizontal guidelines (Y)
+    if (this.customGuides && this.customGuides.length) {
+      for (const gy of this.customGuides) {
+        const sy = this.fontToScreen(0, gy).y;
+        const gLine = this._el('line', { x1: 0, y1: sy, x2: W, y2: sy, class: 'guide-line guide-custom' });
+        this.gridLayer.appendChild(gLine);
+        const gLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        gLabel.setAttribute('x', W - 4);
+        gLabel.setAttribute('y', sy - 3);
+        gLabel.setAttribute('class', 'guide-label');
+        gLabel.setAttribute('text-anchor', 'end');
+        gLabel.textContent = 'Y=' + gy;
+        this.gridLayer.appendChild(gLabel);
+      }
+    }
+    // Custom vertical guidelines (X)
+    if (this.customGuidesX && this.customGuidesX.length) {
+      for (const gx of this.customGuidesX) {
+        const sx = this.fontToScreen(gx, 0).x;
+        const gLine = this._el('line', { x1: sx, y1: 0, x2: sx, y2: H, class: 'guide-line guide-custom' });
+        this.gridLayer.appendChild(gLine);
+        const gLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        gLabel.setAttribute('x', sx + 3);
+        gLabel.setAttribute('y', 14);
+        gLabel.setAttribute('class', 'guide-label');
+        gLabel.textContent = 'X=' + gx;
+        this.gridLayer.appendChild(gLabel);
+      }
+    }
   }
 
   _renderReference() {
     this.refLayer.innerHTML = '';
     if (!this.showReference || !this.glyph || !this.glyph.char) return;
-    const { ascender, descender } = this.options;
+    const { ascender, descender, upm, capHeight } = this.options;
     const fontH = ascender - descender;
-    // Draw reference character as text element (will be flipped with group)
-    // We need to flip text back since the group already flips Y
-    const g = this._el('g', { transform: `translate(0, ${ascender}) scale(1,-1)` });
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     const aw = this.glyph.advanceWidth || 600;
-    text.setAttribute('x', aw / 2);
+
+    // Per-font tuning for size and baseline nudge
+    const rawSize = upm || fontH;
+    let sizeMul, nudgePct;
+    if (this.referenceFont === 'monospace') {
+      sizeMul = 0.87;
+      nudgePct = -0.02; // slightly up
+    } else if (this.referenceFont === 'sans-serif') {
+      sizeMul = 0.96;
+      nudgePct = 0.0;
+    } else {
+      // serif
+      sizeMul = 0.98;
+      nudgePct = 0.03;
+    }
+
+    // Allow manual override from options
+    if (this.refSizeOverride != null) sizeMul = this.refSizeOverride;
+    if (this.refNudgeOverride != null) nudgePct = this.refNudgeOverride;
+
+    const adjustedSize = rawSize * sizeMul;
+    const nudge = adjustedSize * nudgePct;
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('transform', `translate(${aw / 2}, ${-nudge}) scale(1, -1)`);
+    text.setAttribute('x', 0);
     text.setAttribute('y', 0);
     text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('dominant-baseline', 'auto');
-    text.setAttribute('font-size', fontH);
+    text.setAttribute('font-size', adjustedSize);
     text.setAttribute('font-family', this.referenceFont);
-    text.setAttribute('fill', '#8888cc');
+    text.setAttribute('fill', '#888888');
     text.textContent = this.glyph.char;
-    g.appendChild(text);
-    this.refLayer.appendChild(g);
+    this.refLayer.appendChild(text);
   }
+
 
   _renderPaths() {
     this.pathsLayer.innerHTML = '';
@@ -225,11 +311,11 @@ class GlyphEditor {
     const d = cmdsToDString(pathData);
     const pathEl = this._el('path', {
       d,
-      fill: '#ddeeff',
+      fill: '#000000',
       'fill-rule': 'evenodd',
-      stroke: '#4fc3f7',
+      stroke: '#000000',
       'stroke-width': String(1 / this.zoom),
-      opacity: '0.85',
+      opacity: '1',
       class: 'glyph-path',
     });
     this.pathsLayer.appendChild(pathEl);
@@ -237,7 +323,7 @@ class GlyphEditor {
 
   _renderNodes() {
     this.nodesLayer.innerHTML = '';
-    if (this.editMode === 'move' || !this.glyph || !this.glyph.pathData) return;
+    if (this.editMode === 'move' || this.editMode === 'pen' || !this.glyph || !this.glyph.pathData) return;
     const cmds = this.glyph.pathData;
     const nR = 5 / this.zoom;    // node radius in font units
     const hR = 3.5 / this.zoom;  // handle radius
@@ -262,19 +348,30 @@ class GlyphEditor {
         nodeIdx++;
       }
 
-      // Draw handle lines first
+      // Draw handle lines and circles
       if (this.showHandles) {
         for (const p of pts) {
           if (p.type === 'handle') {
-            const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#81d4fa', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
+            // Always draw the handle line
+            const line = this._el('line', { x1: p.ax, y1: p.ay, x2: p.hx, y2: p.hy, stroke: '#888', 'stroke-width': sw, 'stroke-dasharray': `${3 / this.zoom},${2 / this.zoom}`, 'pointer-events': 'none' });
             this.nodesLayer.appendChild(line);
           }
         }
-        // Draw handle circles
         for (const p of pts) {
           if (p.type === 'handle') {
             const isSel = this.selectedHandle && this.selectedHandle.cmdIdx === p.cmdIdx && this.selectedHandle.side === p.side;
-            const circle = this._el('circle', { cx: p.hx, cy: p.hy, r: hR, fill: 'none', stroke: isSel ? '#ffcc02' : '#81d4fa', 'stroke-width': sw, cursor: 'move', 'data-cmd': p.cmdIdx, 'data-side': p.side });
+            // If handle overlaps anchor, offset slightly so it's still visible & draggable
+            let hx = p.hx, hy = p.hy;
+            const dist = Math.hypot(hx - p.ax, hy - p.ay);
+            const minDist = 4 / this.zoom;
+            const isCollapsed = dist < minDist;
+            const circle = this._el('circle', {
+              cx: hx, cy: hy, r: isCollapsed ? hR * 1.5 : hR,
+              fill: isCollapsed ? '#c07070' : 'none',
+              stroke: isSel ? '#000' : '#888',
+              'stroke-width': sw, cursor: 'move',
+              'data-cmd': p.cmdIdx, 'data-side': p.side,
+            });
             circle.addEventListener('mousedown', e => this._handleHandleMousedown(e, p.cmdIdx, p.side));
             this.nodesLayer.appendChild(circle);
           }
@@ -285,7 +382,7 @@ class GlyphEditor {
       for (const p of pts) {
         if (p.type === 'anchor') {
           const isSel = this.selectedNode === p.cmdIdx;
-          const circle = this._el('circle', { cx: p.x, cy: p.y, r: nR, fill: isSel ? '#ffcc02' : '#4fc3f7', stroke: '#0a0a1a', 'stroke-width': sw * 1.5, cursor: 'move', 'data-cmd': p.cmdIdx });
+          const circle = this._el('circle', { cx: p.x, cy: p.y, r: nR, fill: isSel ? '#000' : '#fff', stroke: '#000', 'stroke-width': sw * 1.5, cursor: 'move', 'data-cmd': p.cmdIdx });
           circle.addEventListener('mousedown', e => this._handleNodeMousedown(e, p.cmdIdx));
           this.nodesLayer.appendChild(circle);
         }
@@ -312,7 +409,106 @@ class GlyphEditor {
     this.svg.addEventListener('mouseup', e => this._onMouseup(e));
     this.svg.addEventListener('wheel', e => this._onWheel(e), { passive: false });
     this.svg.addEventListener('dblclick', e => this._onDblclick(e));
-    this.svg.addEventListener('contextmenu', e => e.preventDefault());
+    this.svg.addEventListener('contextmenu', e => this._onContextMenu(e));
+
+    // ─── Touch events ───────────────────────────────────────────────────
+    this._lastTouchDist = 0;
+    this._lastTouchMid = null;
+    this._touchStartZoom = 1;
+
+    this.svg.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom start
+        e.preventDefault();
+        const t = e.touches;
+        this._lastTouchDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+        this._lastTouchMid = { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+        this._touchStartZoom = this.zoom;
+        return;
+      }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const mouseEvt = new MouseEvent('mousedown', {
+          clientX: touch.clientX, clientY: touch.clientY,
+          button: 0, bubbles: true, cancelable: true
+        });
+        // Copy target for node/handle detection
+        Object.defineProperty(mouseEvt, 'target', { value: document.elementFromPoint(touch.clientX, touch.clientY) || e.target });
+        this._onMousedown(mouseEvt);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchmove', e => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        e.preventDefault();
+        const t = e.touches;
+        const dist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+        const mid = { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 };
+        if (this._lastTouchDist > 0) {
+          const scale = dist / this._lastTouchDist;
+          const newZoom = Math.min(5, Math.max(0.05, this._touchStartZoom * scale));
+          // Pan so that midpoint stays fixed
+          const rect = this.svg.getBoundingClientRect();
+          const sx = mid.x - rect.left, sy = mid.y - rect.top;
+          const fp = this.screenToFont(sx, sy);
+          this.zoom = newZoom;
+          // Adjust pan to keep fp at screen position (sx, sy)
+          const { ascender } = this.options;
+          this.panX = sx - fp.x * this.zoom;
+          this.panY = sy - (ascender - fp.y) * this.zoom;
+          this._updateTransform();
+          this._renderGrid();
+          this._renderNodes();
+          if (this.options.onZoomChange) this.options.onZoomChange(this.zoom);
+        }
+        return;
+      }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const mouseEvt = new MouseEvent('mousemove', {
+          clientX: touch.clientX, clientY: touch.clientY,
+          button: 0, bubbles: true, cancelable: true
+        });
+        this._onMousemove(mouseEvt);
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchend', e => {
+      if (e.touches.length === 0) {
+        this._lastTouchDist = 0;
+        this._lastTouchMid = null;
+        const mouseEvt = new MouseEvent('mouseup', {
+          button: 0, bubbles: true, cancelable: true
+        });
+        this._onMouseup(mouseEvt);
+      }
+      // If going from 2 touches to 1, reset pinch state
+      if (e.touches.length === 1) {
+        this._lastTouchDist = 0;
+        this._lastTouchMid = null;
+      }
+    }, { passive: false });
+
+    this.svg.addEventListener('touchcancel', e => {
+      this._lastTouchDist = 0;
+      this._lastTouchMid = null;
+      this.dragState = null;
+    }, { passive: false });
+
+    // Escape to finalize pen path
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.editMode === 'pen' && this.penState) {
+        if (this.penState.cmds.length > 1) {
+          this._finalizePenPath();
+        } else {
+          this.penState = null;
+          this._renderPenPreview();
+        }
+      }
+    });
   }
 
   _getEventPos(e) {
@@ -321,7 +517,19 @@ class GlyphEditor {
   }
 
   _onMousedown(e) {
-    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer')) {
+    // Pen tool: accept clicks anywhere on the canvas
+    if (this.editMode === 'pen' && e.button === 0 && !e.altKey) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
+        this.dragState = { type: 'pan', startSx: sx, startSy: sy, startPanX: this.panX, startPanY: this.panY };
+        e.preventDefault(); return;
+      }
+      this._penMousedown(fp, e);
+      e.preventDefault();
+      return;
+    }
+    if (e.target === this.svg || e.target === this.pathsLayer || e.target.closest('#paths-layer') || e.target.closest('#resize-layer') || e.target.closest('#nodes-layer') || e.target.closest('#pen-preview')) {
       const { sx, sy } = this._getEventPos(e);
       const fp = this.screenToFont(sx, sy);
       if (e.button === 1 || (e.button === 0 && (e.altKey || e.spaceKey))) {
@@ -329,12 +537,17 @@ class GlyphEditor {
         e.preventDefault(); return;
       }
       if (this.editMode === 'select' || this.editMode === 'node') {
+        // In select mode, clicking on glyph area = move. But NOT if clicking nodes/handles.
+        if (this.editMode === 'select' && this.glyph && this.glyph.pathData.length > 0 && !e.target.closest('#nodes-layer')) {
+          const b = getCmdsBounds(this.glyph.pathData);
+          if (b.w > 0 && fp.x >= b.x && fp.x <= b.x + b.w && fp.y >= b.y && fp.y <= b.y + b.h) {
+            this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
+            return;
+          }
+        }
         this.selectedNode = -1; this.selectedHandle = null;
         this._renderNodes();
         if (this.options.onSelectionChange) this.options.onSelectionChange(null, null);
-      }
-      if (this.editMode === 'move' && this.glyph) {
-        this.dragState = { type: 'move-glyph', startSx: sx, startSy: sy, origData: JSON.parse(JSON.stringify(this.glyph.pathData)) };
       }
     }
   }
@@ -360,6 +573,13 @@ class GlyphEditor {
   }
 
   _onMousemove(e) {
+    // Pen tool preview (always track cursor for preview line)
+    if (this.editMode === 'pen' && this.penState) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      this._penMousemove(fp);
+      if (!this.dragState) return;
+    }
     if (!this.dragState) return;
     const { sx, sy } = this._getEventPos(e);
     const ds = this.dragState;
@@ -398,12 +618,190 @@ class GlyphEditor {
       const fp0 = this.screenToFont(ds.startSx, ds.startSy);
       const dx = fp.x - fp0.x, dy = fp.y - fp0.y;
       this.glyph.pathData = transformCmds(JSON.parse(JSON.stringify(ds.origData)), dx, dy, 1, 1);
-      this._renderPaths(); this._renderNodes(); this._notifyBBox(); this._notifyChange();
+      this._renderPaths(); this._renderNodes(); this._renderResizeHandles(); this._notifyBBox(); this._notifyChange();
+    }
+    if (ds.type === 'resize') {
+      const fp = this.screenToFont(sx, sy);
+      this._applyResize(ds, fp.x, fp.y);
     }
   }
 
+  _applyResize(ds, fx, fy) {
+    const ob = ds.origBBox;
+    const handle = ds.handle;
+    let newMinX = ob.x, newMinY = ob.y, newMaxX = ob.x + ob.w, newMaxY = ob.y + ob.h;
+
+    // Which edges move depends on handle
+    if (handle.includes('l')) newMinX = Math.min(fx, newMaxX - 1);
+    if (handle.includes('r')) newMaxX = Math.max(fx, newMinX + 1);
+    if (handle.includes('b')) newMinY = Math.min(fy, newMaxY - 1);
+    if (handle.includes('t')) newMaxY = Math.max(fy, newMinY + 1);
+
+    const newW = newMaxX - newMinX;
+    const newH = newMaxY - newMinY;
+    const sx = newW / ob.w;
+    const sy = newH / ob.h;
+
+    // Scale from original bbox origin, then translate to new position
+    const cmds = JSON.parse(JSON.stringify(ds.origData));
+    const scaled = cmds.map(c => {
+      const pt = (x, y) => ({
+        x: (x - ob.x) * sx + newMinX,
+        y: (y - ob.y) * sy + newMinY,
+      });
+      if (c.type === 'M' || c.type === 'L') { const p = pt(c.x, c.y); return { ...c, x: p.x, y: p.y }; }
+      if (c.type === 'C') {
+        const p1 = pt(c.cp1x, c.cp1y), p2 = pt(c.cp2x, c.cp2y), p = pt(c.x, c.y);
+        return { ...c, cp1x: p1.x, cp1y: p1.y, cp2x: p2.x, cp2y: p2.y, x: p.x, y: p.y };
+      }
+      return { ...c };
+    });
+    this.glyph.pathData = scaled;
+    this._renderPaths(); this._renderNodes(); this._renderResizeHandles(); this._notifyBBox(); this._notifyChange();
+  }
+
   _onMouseup(e) {
+    if (this.editMode === 'pen' && this.penState) {
+      const { sx, sy } = this._getEventPos(e);
+      const fp = this.screenToFont(sx, sy);
+      if (this.penState.dragging) {
+        this._penMouseup(fp);
+      }
+    }
     this.dragState = null;
+  }
+
+  // ─── Pen Tool ───────────────────────────────────────────────────────────────
+
+  _penMousedown(fp, e) {
+    if (!this.glyph) return;
+    const closeDist = 12 / this.zoom;
+    if (!this.penState) {
+      // Start a new subpath
+      this.penState = { cmds: [{ type: 'M', x: fp.x, y: fp.y }], firstPoint: { x: fp.x, y: fp.y }, dragging: true, dragStart: { x: fp.x, y: fp.y }, lastCp: null };
+      this._renderPenPreview();
+      return;
+    }
+    // Check if clicking near first point to close
+    const dx = fp.x - this.penState.firstPoint.x;
+    const dy = fp.y - this.penState.firstPoint.y;
+    if (this.penState.cmds.length > 2 && Math.sqrt(dx * dx + dy * dy) < closeDist) {
+      // Close the path
+      this.penState.cmds.push({ type: 'Z' });
+      this._finalizePenPath();
+      return;
+    }
+    // Add a new point (will determine line vs curve on mouseup based on drag)
+    this.penState.dragging = true;
+    this.penState.dragStart = { x: fp.x, y: fp.y };
+    this.penState.pendingPoint = { x: fp.x, y: fp.y };
+  }
+
+  _penMousemove(fp) {
+    if (!this.penState) return;
+    if (this.penState.dragging && this.penState.pendingPoint) {
+      // Show preview of curve handle
+      this._renderPenPreview(fp);
+    } else {
+      // Show preview line to cursor
+      this._renderPenPreview(fp);
+    }
+  }
+
+  _penMouseup(fp) {
+    if (!this.penState || !this.penState.dragging) return;
+    if (!this.penState.pendingPoint) {
+      // First point drag - record the outgoing handle for next segment
+      const dx = fp.x - this.penState.dragStart.x;
+      const dy = fp.y - this.penState.dragStart.y;
+      if (Math.abs(dx) > 2 / this.zoom || Math.abs(dy) > 2 / this.zoom) {
+        this.penState.lastCp = { x: fp.x, y: fp.y };
+      }
+      this.penState.dragging = false;
+      this._renderPenPreview();
+      return;
+    }
+    const pp = this.penState.pendingPoint;
+    const dx = fp.x - pp.x;
+    const dy = fp.y - pp.y;
+    const dragged = Math.abs(dx) > 2 / this.zoom || Math.abs(dy) > 2 / this.zoom;
+    if (dragged) {
+      // Curve: compute cp1 from lastCp reflection, cp2 from drag
+      const cp2x = 2 * pp.x - fp.x;
+      const cp2y = 2 * pp.y - fp.y;
+      let cp1x, cp1y;
+      if (this.penState.lastCp) {
+        cp1x = this.penState.lastCp.x;
+        cp1y = this.penState.lastCp.y;
+      } else {
+        // No previous handle, use the previous point
+        const prevCmds = this.penState.cmds;
+        const lastCmd = prevCmds[prevCmds.length - 1];
+        const prevPt = lastCmd.type === 'C' ? { x: lastCmd.x, y: lastCmd.y } : { x: lastCmd.x, y: lastCmd.y };
+        cp1x = prevPt.x;
+        cp1y = prevPt.y;
+      }
+      this.penState.cmds.push({ type: 'C', cp1x, cp1y, cp2x, cp2y, x: pp.x, y: pp.y });
+      this.penState.lastCp = { x: fp.x, y: fp.y };
+    } else {
+      // Line segment
+      this.penState.cmds.push({ type: 'L', x: pp.x, y: pp.y });
+      this.penState.lastCp = null;
+    }
+    this.penState.pendingPoint = null;
+    this.penState.dragging = false;
+    this._renderPenPreview();
+  }
+
+  _finalizePenPath() {
+    if (!this.penState || !this.glyph) return;
+    // Notify before change so undo snapshot captures state BEFORE pen path
+    if (this.options.onBeforePenFinalize) this.options.onBeforePenFinalize();
+    const newCmds = this.penState.cmds;
+    this.glyph.pathData = this.glyph.pathData.concat(newCmds);
+    this.penState = null;
+    this.render();
+    this._notifyBBox();
+    this._notifyChange();
+  }
+
+  _renderPenPreview(cursorFp) {
+    // Remove old preview
+    const old = this.mainGroup.querySelector('#pen-preview');
+    if (old) old.remove();
+    if (!this.penState) return;
+    const g = this._el('g', { id: 'pen-preview' });
+    const sw = 1.5 / this.zoom;
+    const nR = 4 / this.zoom;
+    // Draw existing pen path segments
+    if (this.penState.cmds.length > 0) {
+      const d = cmdsToDString(this.penState.cmds);
+      const path = this._el('path', { d, fill: 'none', stroke: '#000', 'stroke-width': String(sw), 'stroke-dasharray': `${4/this.zoom},${3/this.zoom}` });
+      g.appendChild(path);
+    }
+    // Draw dots at each point
+    for (const c of this.penState.cmds) {
+      if (c.type === 'M' || c.type === 'L' || c.type === 'C') {
+        const dot = this._el('circle', { cx: c.x, cy: c.y, r: nR, fill: '#000', stroke: 'none' });
+        g.appendChild(dot);
+      }
+    }
+    // First point indicator (larger)
+    if (this.penState.firstPoint) {
+      const fp = this.penState.firstPoint;
+      const ring = this._el('circle', { cx: fp.x, cy: fp.y, r: nR * 1.5, fill: 'none', stroke: '#000', 'stroke-width': String(sw) });
+      g.appendChild(ring);
+    }
+    // Preview line from last point to cursor
+    if (cursorFp && this.penState.cmds.length > 0) {
+      const lastCmd = this.penState.cmds[this.penState.cmds.length - 1];
+      if (lastCmd.type !== 'Z') {
+        const lx = lastCmd.x, ly = lastCmd.y;
+        const line = this._el('line', { x1: lx, y1: ly, x2: cursorFp.x, y2: cursorFp.y, stroke: '#666', 'stroke-width': String(sw), 'stroke-dasharray': `${3/this.zoom},${2/this.zoom}` });
+        g.appendChild(line);
+      }
+    }
+    this.mainGroup.appendChild(g);
   }
 
   _onWheel(e) {
@@ -419,8 +817,235 @@ class GlyphEditor {
     if (this.options.onZoomChange) this.options.onZoomChange(this.zoom);
   }
 
+  _onContextMenu(e) {
+    e.preventDefault();
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    // Check if right-clicking on a node
+    const target = e.target;
+    const cmdAttr = target.getAttribute('data-cmd');
+    if (cmdAttr == null) return;
+    const cmdIdx = parseInt(cmdAttr);
+    const cmd = this.glyph.pathData[cmdIdx];
+    if (!cmd) return;
+
+    // Show context menu
+    this._showNodeContextMenu(e.clientX, e.clientY, cmdIdx, cmd);
+  }
+
+  _showNodeContextMenu(x, y, cmdIdx, cmd) {
+    // Remove existing menu
+    const old = document.getElementById('node-ctx-menu');
+    if (old) old.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'node-ctx-menu';
+    menu.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:9999;background:#fff;border:2px solid #000;border-radius:6px;padding:4px 0;min-width:160px;box-shadow:2px 2px 8px rgba(0,0,0,0.2);font-size:12px`;
+
+    const addItem = (label, fn) => {
+      const item = document.createElement('div');
+      item.textContent = label;
+      item.style.cssText = 'padding:6px 14px;cursor:pointer;color:#000';
+      item.addEventListener('mouseenter', () => item.style.background = '#f0f0f0');
+      item.addEventListener('mouseleave', () => item.style.background = 'none');
+      item.addEventListener('click', () => { menu.remove(); fn(); });
+      menu.appendChild(item);
+    };
+
+    if (cmd.type === 'L') {
+      addItem('→ ベジェ曲線に変換 (ハンドル追加)', () => this._convertToCurve(cmdIdx));
+    } else if (cmd.type === 'C') {
+      addItem('→ 直線に変換 (ハンドル削除)', () => this._convertToLine(cmdIdx));
+    }
+    addItem('ノードを削除', () => { this.selectedNode = cmdIdx; this.deleteSelectedNode(); });
+
+    document.body.appendChild(menu);
+    // Close on click outside
+    const close = (ev) => { if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', close); } };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+  }
+
+  _convertToCurve(cmdIdx) {
+    const cmds = this.glyph.pathData;
+    const c = cmds[cmdIdx];
+    if (!c || c.type !== 'L') return;
+    // Find previous point
+    let prevX = 0, prevY = 0;
+    for (let i = cmdIdx - 1; i >= 0; i--) {
+      if (cmds[i].type === 'M' || cmds[i].type === 'L' || cmds[i].type === 'C') {
+        prevX = cmds[i].x; prevY = cmds[i].y; break;
+      }
+    }
+    // Convert L to C with handles at 1/3 and 2/3 of the line
+    cmds[cmdIdx] = {
+      type: 'C',
+      cp1x: prevX + (c.x - prevX) / 3,
+      cp1y: prevY + (c.y - prevY) / 3,
+      cp2x: prevX + 2 * (c.x - prevX) / 3,
+      cp2y: prevY + 2 * (c.y - prevY) / 3,
+      x: c.x, y: c.y,
+    };
+    this.render(); this._notifyChange();
+  }
+
+  _convertToLine(cmdIdx) {
+    const cmds = this.glyph.pathData;
+    const c = cmds[cmdIdx];
+    if (!c || c.type !== 'C') return;
+    cmds[cmdIdx] = { type: 'L', x: c.x, y: c.y };
+    this.render(); this._notifyChange();
+  }
+
   _onDblclick(e) {
-    // Future: add node on double-click on path
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    if (this.editMode !== 'select' && this.editMode !== 'node') return;
+    const { sx, sy } = this._getEventPos(e);
+    const fp = this.screenToFont(sx, sy);
+    this._addNodeAtPoint(fp.x, fp.y);
+  }
+
+  _addNodeAtPoint(fx, fy) {
+    const cmds = this.glyph.pathData;
+    let bestDist = Infinity, bestIdx = -1, bestT = 0.5;
+    let px = 0, py = 0;
+
+    for (let i = 0; i < cmds.length; i++) {
+      const c = cmds[i];
+      if (c.type === 'M') { px = c.x; py = c.y; continue; }
+      if (c.type === 'Z') continue;
+      if (c.type === 'L') {
+        // Distance from point to line segment
+        const dx = c.x - px, dy = c.y - py;
+        const len2 = dx * dx + dy * dy;
+        if (len2 === 0) { px = c.x; py = c.y; continue; }
+        let t = ((fx - px) * dx + (fy - py) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = px + t * dx, cy = py + t * dy;
+        const dist = Math.hypot(fx - cx, fy - cy);
+        if (dist < bestDist) { bestDist = dist; bestIdx = i; bestT = t; }
+        px = c.x; py = c.y;
+      }
+      if (c.type === 'C') {
+        // Sample cubic bezier at multiple t values
+        for (let st = 0; st <= 1; st += 0.05) {
+          const pt = this._cubicAt(px, py, c.cp1x, c.cp1y, c.cp2x, c.cp2y, c.x, c.y, st);
+          const dist = Math.hypot(fx - pt.x, fy - pt.y);
+          if (dist < bestDist) { bestDist = dist; bestIdx = i; bestT = st; }
+        }
+        px = c.x; py = c.y;
+      }
+    }
+
+    // Only add if close enough to a path segment
+    const threshold = 20 / this.zoom;
+    if (bestIdx < 0 || bestDist > threshold) return;
+
+    const c = cmds[bestIdx];
+    // Find previous point
+    let prevX = 0, prevY = 0;
+    for (let i = bestIdx - 1; i >= 0; i--) {
+      const p = cmds[i];
+      if (p.type === 'M' || p.type === 'L' || p.type === 'C') {
+        prevX = p.x; prevY = p.y; break;
+      }
+    }
+
+    if (c.type === 'L') {
+      // Split line into two lines
+      const mx = prevX + bestT * (c.x - prevX);
+      const my = prevY + bestT * (c.y - prevY);
+      const newNode = { type: 'L', x: mx, y: my };
+      cmds.splice(bestIdx, 0, newNode);
+    } else if (c.type === 'C') {
+      // Split cubic bezier using de Casteljau
+      const t = bestT;
+      const p0x = prevX, p0y = prevY;
+      const p1x = c.cp1x, p1y = c.cp1y;
+      const p2x = c.cp2x, p2y = c.cp2y;
+      const p3x = c.x, p3y = c.y;
+
+      const q0x = p0x + t * (p1x - p0x), q0y = p0y + t * (p1y - p0y);
+      const q1x = p1x + t * (p2x - p1x), q1y = p1y + t * (p2y - p1y);
+      const q2x = p2x + t * (p3x - p2x), q2y = p2y + t * (p3y - p2y);
+      const r0x = q0x + t * (q1x - q0x), r0y = q0y + t * (q1y - q0y);
+      const r1x = q1x + t * (q2x - q1x), r1y = q1y + t * (q2y - q1y);
+      const sx = r0x + t * (r1x - r0x), sy = r0y + t * (r1y - r0y);
+
+      // First half
+      const first = { type: 'C', cp1x: q0x, cp1y: q0y, cp2x: r0x, cp2y: r0y, x: sx, y: sy };
+      // Second half
+      const second = { type: 'C', cp1x: r1x, cp1y: r1y, cp2x: q2x, cp2y: q2y, x: p3x, y: p3y };
+      cmds.splice(bestIdx, 1, first, second);
+    }
+
+    this.render();
+    this._notifyBBox();
+    this._notifyChange();
+  }
+
+  _cubicAt(x0, y0, x1, y1, x2, y2, x3, y3, t) {
+    const mt = 1 - t;
+    return {
+      x: mt*mt*mt*x0 + 3*mt*mt*t*x1 + 3*mt*t*t*x2 + t*t*t*x3,
+      y: mt*mt*mt*y0 + 3*mt*mt*t*y1 + 3*mt*t*t*y2 + t*t*t*y3,
+    };
+  }
+
+  // ─── Resize Handles ──────────────────────────────────────────────────────────
+
+  _renderResizeHandles() {
+    this.resizeLayer.innerHTML = '';
+    if (this.editMode !== 'select' || !this.glyph || !this.glyph.pathData || !this.glyph.pathData.length) return;
+    const b = getCmdsBounds(this.glyph.pathData);
+    if (b.w === 0 && b.h === 0) return;
+
+    const sw = 1 / this.zoom;
+    const hSize = 6 / this.zoom;
+
+    // Bounding box outline
+    const rect = this._el('rect', {
+      x: b.x, y: b.y, width: b.w, height: b.h,
+      fill: 'none', stroke: '#000', 'stroke-width': sw,
+      'stroke-dasharray': `${4 / this.zoom},${3 / this.zoom}`,
+      'pointer-events': 'none', opacity: '0.5',
+    });
+    this.resizeLayer.appendChild(rect);
+
+    // 8 handles: corners + midpoints
+    const handles = [
+      { id: 'tl', x: b.x,            y: b.y + b.h,      cursor: 'nwse-resize' },
+      { id: 'tr', x: b.x + b.w,      y: b.y + b.h,      cursor: 'nesw-resize' },
+      { id: 'bl', x: b.x,            y: b.y,             cursor: 'nesw-resize' },
+      { id: 'br', x: b.x + b.w,      y: b.y,             cursor: 'nwse-resize' },
+      { id: 't',  x: b.x + b.w / 2,  y: b.y + b.h,      cursor: 'ns-resize' },
+      { id: 'b',  x: b.x + b.w / 2,  y: b.y,             cursor: 'ns-resize' },
+      { id: 'l',  x: b.x,            y: b.y + b.h / 2,   cursor: 'ew-resize' },
+      { id: 'r',  x: b.x + b.w,      y: b.y + b.h / 2,   cursor: 'ew-resize' },
+    ];
+
+    for (const h of handles) {
+      const el = this._el('rect', {
+        x: h.x - hSize / 2, y: h.y - hSize / 2,
+        width: hSize, height: hSize,
+        fill: '#fff', stroke: '#000', 'stroke-width': sw,
+        cursor: h.cursor, 'data-handle': h.id,
+      });
+      el.addEventListener('mousedown', e => this._handleResizeMousedown(e, h.id));
+      this.resizeLayer.appendChild(el);
+    }
+  }
+
+  _handleResizeMousedown(e, handleId) {
+    e.stopPropagation();
+    if (!this.glyph || !this.glyph.pathData.length) return;
+    const { sx, sy } = this._getEventPos(e);
+    const b = getCmdsBounds(this.glyph.pathData);
+    this.dragState = {
+      type: 'resize',
+      handle: handleId,
+      startSx: sx, startSy: sy,
+      origBBox: { ...b },
+      origData: JSON.parse(JSON.stringify(this.glyph.pathData)),
+    };
   }
 
   // ─── Transform operations ─────────────────────────────────────────────────
@@ -548,8 +1173,18 @@ class GlyphEditor {
   // ─── Settings ─────────────────────────────────────────────────────────────
 
   setEditMode(mode) {
+    // If leaving pen mode, finalize any in-progress path
+    if (this.editMode === 'pen' && mode !== 'pen' && this.penState) {
+      if (this.penState.cmds.length > 1) {
+        this._finalizePenPath();
+      } else {
+        this.penState = null;
+        const old = this.mainGroup.querySelector('#pen-preview');
+        if (old) old.remove();
+      }
+    }
     this.editMode = mode;
-    this.svg.style.cursor = mode === 'move' ? 'grab' : 'default';
+    this.svg.style.cursor = mode === 'pen' ? 'crosshair' : 'default';
     this.render();
   }
 
